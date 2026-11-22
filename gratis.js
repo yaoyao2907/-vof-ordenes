@@ -194,3 +194,33 @@ function abrirCfg(msg){var c=cfg(),raw={};try{raw=JSON.parse(lsG(CFG_K,'{}'))||{
 window.VOFG={abrirCfg:abrirCfg,cfg:cfg};
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',montarUI);else montarUI();
 })();
+/* ===== Google Drive por Apps Script (sin Google Cloud) ===== */
+(function(){
+var K='vof_apps_script',G=window.GDR;if(!G)return;
+function cfg(){try{return JSON.parse(localStorage.getItem(K)||'{}')||{}}catch(e){return{}}}
+async function llamar(q){
+ var c=cfg();if(!c.url)throw{code:'server_not_connected'};
+ var r,j;
+ try{r=await fetch(c.url+'?k='+encodeURIComponent(c.k||'')+'&'+q)}catch(e){throw{code:'server_unavailable',retryable:true,retryAfterMs:3000}}
+ try{j=await r.json()}catch(e){throw{code:'server_unavailable'}}
+ if(j.error)throw{code:j.error==='clave'?'not_granted':'tool_error'};
+ return j}
+G.conectado=function(){return!!cfg().url};
+G.bytes=async function(id){var j=await llamar('op=get&id='+encodeURIComponent(id));var b=atob(j.b64),u=new Uint8Array(b.length);for(var i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return u};
+G.callTool=async function(srv,tool,input){
+ input=input||{};
+ if(tool==='search_files'){
+  if(input.pageToken)return{payload:{files:[],nextPageToken:null}};
+  var m=/parentId\s*=\s*'([^']+)'/.exec(input.query||'');
+  var j=await llamar('op=list&id='+encodeURIComponent(m?m[1]:''));
+  return{payload:{files:j.files||[],nextPageToken:null}}}
+ if(tool==='download_file_content'){var j2=await llamar('op=get&id='+encodeURIComponent(input.fileId));return{blob:j2.b64}}
+ throw{code:'tool_error'}};
+G.conectar=async function(){
+ var c=cfg();
+ var url=prompt('Pega la URL de tu Apps Script (termina en /exec):',c.url||'');if(!url)return;
+ var k=prompt('Pega la clave que pusiste en el Apps Script:',c.k||'');if(k==null)return;
+ localStorage.setItem(K,JSON.stringify({url:url.trim(),k:k.trim()}));
+ try{await llamar('op=ping');alert('Google Drive conectado. La página se va a recargar.');location.reload()}
+ catch(e){localStorage.removeItem(K);alert(e&&e.code==='not_granted'?'La clave no coincide con la del Apps Script.':'No se pudo conectar. Revisa la URL del Apps Script.')}};
+})();
