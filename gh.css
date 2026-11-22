@@ -1,4 +1,4 @@
-#ghBar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 14px;background:var(--card,#fff);border-bottom:1px solid var(--ln,#ddd);font-size:12px;position:relative;z-index:5}
+#ghBar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 70px 6px 14px;background:var(--card,#fff);border-bottom:1px solid var(--ln,#ddd);font-size:12px;position:relative;z-index:5}
 #ghBar button{font:inherit;font-weight:700;border:1px solid var(--ac,#b8860b);color:var(--ac,#b8860b);background:transparent;border-radius:5px;padding:5px 10px;cursor:pointer}
 #ghBar button:hover{background:var(--ch,#f6efd9)}
 #ghIA{color:var(--mu,#777)}
@@ -17,3 +17,7 @@
 #ghCfg .ghf{padding:10px 16px;border-top:1px solid var(--ln,#ddd);display:flex;gap:8px;justify-content:flex-end}
 #ghCfg .ghf button{font:inherit;font-weight:800;padding:7px 16px;border-radius:5px;border:1px solid var(--ac,#b8860b);background:var(--ac,#b8860b);color:#fff;cursor:pointer}
 #ghCfg .ghf button+button{background:transparent;color:var(--ac,#b8860b)}
+#ghBar input{font:inherit;font-size:13px;padding:5px 8px;border:1px solid var(--ln,#ccc);border-radius:4px;background:var(--bg,#fff);color:var(--tx,#222);min-width:200px}
+#ghBar .ghok,#ghCfg .ghok{color:var(--ok,#2e8b57);font-weight:700}
+#ghBar .ghsal{margin-left:auto;border-color:var(--mu,#999);color:var(--mu,#777)}
+#ghCfg .ghadm{max-width:320px}#ghCfg .ghmsg{margin:0;font-weight:700}

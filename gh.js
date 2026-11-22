@@ -1,127 +1,108 @@
-/* VOF Órdenes – versión GitHub.
-   1) Carpeta: en vez de Google Drive conectado, la página lee la carpeta "VOF CAMP" del computador
-      (la de Google Drive para escritorio, G:\Mi unidad\VOF CAMP). Se escoge una vez y se vuelve a leer sola.
-   2) IA: claves propias (5 de Gemini, 5 de OpenRouter y 5 de Cloudflare). Si una se queda sin cupo o falla,
-      pasa sola a la siguiente. Las claves se guardan SOLO en este navegador.
-   Este archivo crea window.claude.use('mcp' | 'sample' | 'db') para que el resto de la página funcione igual. */
+/* VOF Órdenes – versión GitHub conectada al Google Drive de Yair por un Apps Script (el "puente").
+   - La dirección del puente va en config.js (window.VOF_PUENTE).
+   - Cada analista escribe una sola vez la clave del equipo; queda guardada en su navegador.
+   - Archivos: el puente lee VOF CAMP con la cuenta de Yair (RESULTADO, ORDENES, CAMBIOS REALIZADOS, VIDEOS).
+   - Datos compartidos: lo que se marca en Validar IA y en Videos lo guarda el puente para todo el equipo.
+   - IA: el puente usa las claves de Gemini / OpenRouter / Cloudflare guardadas en el Apps Script
+     y rota solo cuando una se queda sin cupo. Los analistas no ven las claves.
+   Este archivo crea window.claude.use('mcp' | 'db' | 'sample') para que el resto de la página funcione igual. */
 (function(){
-/* ---------------- carpeta VOF CAMP ---------------- */
-var SUB={'1jU_HN4gxf3tzOAeyxKnxpwQ6xah7T8PF':'RESULTADO','1Tw3kYQt7lgzFfrJ6d3qnmZXeejOEYRNC':'ORDENES',
- '19opjY75bx_G5XCfeF72Vyd3dLfKgttIJ':'CAMBIOS REALIZADOS','1EuXjhfuWCKHaDk1sWxoQWWlHvi5RqyFQ':'VIDEOS'};
-var RAIZ=null,PERM='';
-function idb(){return new Promise(function(ok,no){var r=indexedDB.open('vof_gh',1);r.onupgradeneeded=function(){r.result.createObjectStore('k')};r.onsuccess=function(){ok(r.result)};r.onerror=function(){no(r.error)}})}
-async function idbGet(k){var d=await idb();return new Promise(function(ok){var t=d.transaction('k').objectStore('k').get(k);t.onsuccess=function(){ok(t.result)};t.onerror=function(){ok(null)}})}
-async function idbSet(k,v){var d=await idb();return new Promise(function(ok){var t=d.transaction('k','readwrite');t.objectStore('k').put(v,k);t.oncomplete=ok;t.onerror=ok})}
+var URL_P=(window.VOF_PUENTE||'').trim();if(!/^https?:\/\//.test(URL_P))URL_P='';
+var CLAVE='';try{CLAVE=localStorage.getItem('vof_clave_equipo')||''}catch(e){}
+var ESTADO={ok:false,err:'',ia:null,ult:'',iaErr:''};
+
+async function puente(accion,datos){
+ if(!URL_P)throw{code:'server_not_connected',message:'Falta la dirección del puente en config.js'};
+ var cuerpo=Object.assign({accion:accion,clave:CLAVE},datos||{});
+ var r=await fetch(URL_P,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(cuerpo),redirect:'follow'});
+ var j=await r.json().catch(function(){return{ok:false,error:'El puente no respondió bien (HTTP '+r.status+')'}});
+ if(!j.ok){var e=new Error(j.error||'Error del puente');e.code=j.codigo==='clave'?'not_granted':'tool_error';e.codigo=j.codigo;throw e}
+ return j}
+
+/* ---- conexión: se prueba la clave una vez al cargar ---- */
 var LISTO=(async function(){
- try{RAIZ=window.__VOF_RAIZ?await window.__VOF_RAIZ:await idbGet('raiz')}catch(e){RAIZ=null}   /* __VOF_RAIZ: solo para pruebas */
- if(RAIZ&&RAIZ.queryPermission){try{PERM=await RAIZ.queryPermission({mode:'read'})}catch(e){PERM=''}}
+ if(!URL_P||!CLAVE)return;
+ try{var j=await puente('ping');ESTADO.ok=true;ESTADO.ia=j.ia}
+ catch(e){ESTADO.err=e.codigo==='clave'?'La clave del equipo no es correcta.':(e.message||'No se pudo conectar con el puente.')}
 })();
-async function sub(nombre){if(!RAIZ)throw{code:'server_not_connected'};
- if(RAIZ.name.toUpperCase()===nombre)return RAIZ;
- try{return await RAIZ.getDirectoryHandle(nombre)}catch(e){var err=new Error('No está la carpeta '+nombre+' dentro de '+RAIZ.name);err.code='tool_error';throw err}}
-function b64(buf){var u=new Uint8Array(buf),s='',i;for(i=0;i<u.length;i+=32768)s+=String.fromCharCode.apply(null,u.subarray(i,i+32768));return btoa(s)}
+
+/* ---- Drive (mcp) ---- */
 var MCP={callTool:async function(srv,tool,input){
- if(PERM!=='granted')throw{code:'server_not_connected'};
- if(tool==='search_files'){var m=/parentId = '([^']+)'/.exec(input.query||''),nom=m&&SUB[m[1]];if(!nom)return{payload:{files:[]}};
-  var d=await sub(nom),out=[];
-  for await(var e of d.values()){if(e.kind!=='file')continue;try{var f=await e.getFile();out.push({id:'local:'+nom+'/'+e.name,title:e.name,modifiedTime:new Date(f.lastModified).toISOString(),fileSize:String(f.size)})}catch(x){}}
-  out.sort(function(a,b){return b.modifiedTime.localeCompare(a.modifiedTime)});return{payload:{files:out}}}
- if(tool==='download_file_content'){var p=String(input.fileId||'').replace(/^local:/,'').split('/'),dd=await sub(p[0]);
-  var fh=await dd.getFileHandle(p.slice(1).join('/')),ff=await fh.getFile();return{blob:b64(await ff.arrayBuffer())}}
+ if(tool==='search_files'){var m=/parentId = '([^']+)'/.exec(input.query||'');if(!m)return{payload:{files:[]}};
+  var j=await puente('listar',{carpeta:m[1]});return{payload:{files:j.files||[]}}}
+ if(tool==='download_file_content'){var j2=await puente('bajar',{id:input.fileId});return{blob:j2.blob}}
  throw{code:'tool_error'}}};
-async function conectar(){
- if(!window.showDirectoryPicker){alerta('Este navegador no deja escoger carpetas. Usa Chrome o Edge, o el botón "Abrir carpeta del computador".');return}
- try{var h=RAIZ&&PERM==='prompt'?RAIZ:await window.showDirectoryPicker({id:'vofcamp',mode:'read'});
-  var p=await h.requestPermission({mode:'read'});if(p!=='granted')return;
-  await idbSet('raiz',h);location.reload()}catch(e){}}
-function alerta(t){var d=document.getElementById('ghAviso');if(d){d.querySelector('span').textContent=t;d.hidden=false}}
 
-/* ---------------- IA con claves propias ---------------- */
-var PROV=[
- {k:'gemini',n:'Google Gemini',modelo:'gemini-2.5-flash',max:16,ayuda:'Clave de aistudio.google.com (empieza por AIza…)'},
- {k:'openrouter',n:'OpenRouter',modelo:'qwen/qwen2.5-vl-72b-instruct:free',max:6,ayuda:'Clave de openrouter.ai/keys (sk-or-…); usa un modelo que diga "vision"'},
- {k:'cloudflare',n:'Cloudflare Workers AI',modelo:'@cf/meta/llama-3.2-11b-vision-instruct',max:1,ayuda:'Token de API + ID de cuenta. Ojo: Cloudflare puede bloquear llamadas desde el navegador'}];
-var CFG={};try{CFG=JSON.parse(localStorage.getItem('vof_ia_claves')||'{}')||{}}catch(e){CFG={}}
-PROV.forEach(function(p){var c=CFG[p.k]=CFG[p.k]||{};c.claves=(c.claves||[]).concat(['','','','','']).slice(0,5);if(!c.modelo)c.modelo=p.modelo});
-function guardarCfg(){try{localStorage.setItem('vof_ia_claves',JSON.stringify(CFG))}catch(e){}}
-var FRIO={};                    /* clave que falló -> hora hasta la que no se usa */
-function slots(){var s=[];PROV.forEach(function(p){CFG[p.k].claves.forEach(function(c,i){if(c&&c.trim())s.push({p:p,c:c.trim(),i:i,id:p.k+i})})});return s}
-function hayIA(){return slots().length>0}
-async function blob64(b){return b64(await b.arrayBuffer())}
-async function pedir(sl,texto,imgs){
- var p=sl.p,mod=CFG[p.k].modelo||p.modelo,r,j;
- if(p.k==='gemini'){
-  var parts=[{text:texto}];for(var i=0;i<imgs.length;i++)parts.push({inline_data:{mime_type:imgs[i].type||'image/jpeg',data:await blob64(imgs[i])}});
-  r=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(mod)+':generateContent?key='+encodeURIComponent(sl.c),
-   {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{role:'user',parts:parts}],generationConfig:{temperature:0,responseMimeType:'application/json'}})});
-  j=await r.json().catch(function(){return{}});if(!r.ok)throw{st:r.status,msg:(j.error&&j.error.message)||r.statusText};
-  return((((j.candidates||[])[0]||{}).content||{}).parts||[]).map(function(x){return x.text||''}).join('')}
- var cont=[{type:'text',text:texto}];for(var k=0;k<imgs.length;k++)cont.push({type:'image_url',image_url:{url:'data:image/jpeg;base64,'+await blob64(imgs[k])}});
- var url=p.k==='openrouter'?'https://openrouter.ai/api/v1/chat/completions':'https://api.cloudflare.com/client/v4/accounts/'+encodeURIComponent(CFG.cloudflare.cuenta||'')+'/ai/v1/chat/completions';
- var hd={'Content-Type':'application/json','Authorization':'Bearer '+sl.c};if(p.k==='openrouter'){hd['HTTP-Referer']=location.origin;hd['X-Title']='VOF Ordenes'}
- r=await fetch(url,{method:'POST',headers:hd,body:JSON.stringify({model:mod,temperature:0,max_tokens:1500,messages:[{role:'user',content:cont}]})});
- j=await r.json().catch(function(){return{}});if(!r.ok)throw{st:r.status,msg:(j.error&&(j.error.message||j.error))||(j.errors&&j.errors[0]&&j.errors[0].message)||r.statusText};
- var m=((j.choices||[])[0]||{}).message||{};return typeof m.content==='string'?m.content:(m.content||[]).map(function(x){return x.text||''}).join('')}
-function json(t){var m=/\{[\s\S]*\}/.exec(String(t||''));if(!m)throw{code:'bad_json'};return JSON.parse(m[0])}
-function juntar(a,b){if(!a)return b;if(!b)return a;var o={fotos:(a.fotos||[]).concat(b.fotos||[]),lecturas:Object.assign({},b.lecturas||{})};
- var la=a.lecturas||{};Object.keys(la).forEach(function(k){var v=la[k];if(v!==null&&v!==''&&!(Array.isArray(v)&&!v.length))o.lecturas[k]=v});return o}
-var ESTADO={ult:'',err:''};
-/* misma forma que la capacidad sample de Claude: sample.limits() y sample.json(texto,{images}) */
+/* ---- base compartida (db) ---- */
+function docApi(ruta){return{
+ get:async function(){if(/^snap/.test(ruta))return{exists:false,data:function(){return null}};var j=await puente('db_get',{ruta:ruta});var d=j.datos;return{exists:!!j.existe,id:ruta.split('/').pop(),data:function(){return d}}},
+ set:async function(d){if(/^snap/.test(ruta))return;await puente('db_set',{ruta:ruta,datos:JSON.parse(JSON.stringify(d))})},
+ delete:async function(){if(/^snap/.test(ruta))return;await puente('db_del',{ruta:ruta})}}}
+function colApi(c){var q={orderBy:function(){return q},limit:function(){return q},where:function(){return q},
+ get:async function(){if(/^snap/.test(c))return{docs:[]};var j=await puente('db_lista',{coleccion:c});
+  return{docs:(j.docs||[]).map(function(x){return{id:x.id,data:function(){return x.datos}}})}},
+ doc:function(id){return docApi(c+'/'+id)}};return q}
+var DB={doc:docApi,collection:colApi};
+
+/* ---- IA (misma forma que la capacidad sample de Claude) ---- */
+function hayIA(){var ia=ESTADO.ia;if(!ia)return false;return Object.keys(ia).some(function(p){return(ia[p].guardadas||[]).some(Boolean)})}
+async function b64(b){var u=new Uint8Array(await b.arrayBuffer()),s='',i;for(i=0;i<u.length;i+=32768)s+=String.fromCharCode.apply(null,u.subarray(i,i+32768));return btoa(s)}
 var sample=async function(t){return{text:JSON.stringify(await sample.json(t,{}))}};
-sample.limits=async function(){var s=slots();return{images:{maxCount:s.length?s[0].p.max:0}}};
+sample.limits=async function(){return{images:{maxCount:16}}};
 sample.json=async function(texto,opt){
- var imgs=(opt&&opt.images)||[],intentos=0,ult=null;
- while(true){var ahora=Date.now(),s=slots().filter(function(x){return!(FRIO[x.id]>ahora)});
-  if(!s.length){ESTADO.err=ult?(ult.msg||ult.st):'sin claves';throw{code:'rate_limited',message:'Todas las claves están sin cupo o fallaron: '+ESTADO.err}}
-  var sl=s[0];
-  try{var res;
-   if(imgs.length>sl.p.max){                                   /* el proveedor acepta menos fotos: se parte el lote */
-    var base=+((/numera desde (\d+)/.exec(texto)||[0,1])[1]);
-    for(var i=0;i<imgs.length;i+=sl.p.max){var lote=imgs.slice(i,i+sl.p.max);
-     var tx=texto.replace(/\nOjo: van las fotos[^\n]*/,'')+'\nOjo: van las fotos '+(base+i)+' a '+(base+i+lote.length-1)+'; numera desde '+(base+i)+'.';
-     res=juntar(res,json(await pedir(sl,tx,lote)))}}
-   else res=json(await pedir(sl,texto,imgs));
-   ESTADO.ult=sl.p.n+' · clave '+(sl.i+1);ESTADO.err='';pinta();return res}
-  catch(e){ult=e;var st=e&&e.st;
-   FRIO[sl.id]=Date.now()+(st===429?10*60000:st===401||st===403?24*3600000:2*60000);   /* sin cupo 10 min; clave mala 1 día; otro error 2 min */
-   ESTADO.err=sl.p.n+' clave '+(sl.i+1)+': '+(e.msg||e.message||e.code||'falló');pinta();
-   if(++intentos>20)throw{code:'rate_limited',message:ESTADO.err}}}};
+ var imgs=await Promise.all(((opt&&opt.images)||[]).map(b64));
+ try{var j=await puente('ia',{texto:texto,imagenes:imgs});ESTADO.ult=j.usado||'';ESTADO.iaErr=j.aviso||'';pinta();return j.datos}
+ catch(e){ESTADO.iaErr=e.message||'falló';pinta();throw{code:'rate_limited',message:ESTADO.iaErr}}};
 
-/* ---------------- window.claude para la página ---------------- */
-window.claude={use:async function(n){await LISTO;
- if(n==='mcp')return PERM==='granted'?MCP:null;
- if(n==='sample')return hayIA()?sample:null;
- return null}};
+window.claude={use:async function(n){await LISTO;if(!ESTADO.ok)return null;
+ if(n==='mcp')return MCP;if(n==='db')return DB;if(n==='sample')return hayIA()?sample:null;return null}};
 
-/* ---------------- barra y ventana de configuración ---------------- */
-function pinta(){var e=document.getElementById('ghIA');if(!e)return;var n=slots().length;
- e.textContent=n?('IA: '+n+' clave'+(n>1?'s':'')+(ESTADO.ult?' · usando '+ESTADO.ult:'')+(ESTADO.err?' · ⚠ '+ESTADO.err:'')):'IA: sin claves'}
-function modal(){
- var m=document.getElementById('ghCfg');
- m.querySelector('.ghb').innerHTML=PROV.map(function(p){var c=CFG[p.k];
-  return'<fieldset><legend>'+p.n+'</legend><p class="mu">'+p.ayuda+'</p>'+c.claves.map(function(v,i){return'<label>Clave '+(i+1)+'<input type="password" autocomplete="off" data-p="'+p.k+'" data-i="'+i+'" value="'+String(v).replace(/"/g,'&quot;')+'"></label>'}).join('')+
-   (p.k==='cloudflare'?'<label>ID de cuenta<input type="text" data-p="cloudflare" data-c="cuenta" value="'+String(c.cuenta||'').replace(/"/g,'&quot;')+'"></label>':'')+
-   '<label>Modelo<input type="text" data-p="'+p.k+'" data-c="modelo" value="'+String(c.modelo||'').replace(/"/g,'&quot;')+'"></label></fieldset>'}).join('');
+/* ---- barra de arriba y ventanas ---- */
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function pinta(){var e=document.getElementById('ghIA');if(!e)return;
+ if(!ESTADO.ok){e.textContent='';return}
+ var n=0;if(ESTADO.ia)Object.keys(ESTADO.ia).forEach(function(p){n+=(ESTADO.ia[p].guardadas||[]).filter(Boolean).length});
+ e.textContent=n?('IA: '+n+' clave'+(n>1?'s':'')+(ESTADO.ult?' · usando '+ESTADO.ult:'')+(ESTADO.iaErr?' · ⚠ '+ESTADO.iaErr:'')):'IA: sin claves (las pone el administrador)'}
+function modalClaves(){var m=document.getElementById('ghCfg'),ia=ESTADO.ia||{};
+ m.querySelector('.ghb').innerHTML='<label class="ghadm">Clave de administrador<input type="password" id="ghAdm" autocomplete="off"></label>'+
+  ['gemini','openrouter','cloudflare'].map(function(p){var x=ia[p]||{guardadas:[]};
+  return'<fieldset><legend>'+esc(x.nombre||p)+'</legend>'+[0,1,2,3,4].map(function(i){var g=(x.guardadas||[])[i];
+   return'<label>Clave '+(i+1)+(g?' <b class="ghok">guardada</b>':'')+'<input type="password" autocomplete="off" data-p="'+p+'" data-i="'+i+'" placeholder="'+(g?'(dejar igual)':'pega la clave')+'"></label>'}).join('')+
+   (p==='cloudflare'?'<label>ID de cuenta<input type="text" data-p="cloudflare" data-c="cuenta" value="'+esc(x.cuenta||'')+'"></label>':'')+
+   '<label>Modelo<input type="text" data-p="'+p+'" data-c="modelo" value="'+esc(x.modelo||'')+'"></label></fieldset>'}).join('')+
+  '<p class="mu">Escribe <b>-</b> en una clave para borrarla. Las claves se guardan en tu Apps Script; los analistas no las ven.</p><p class="ghmsg" id="ghMsg"></p>';
  m.hidden=false}
+async function guardarClaves(){var m=document.getElementById('ghCfg'),c={};
+ [].forEach.call(m.querySelectorAll('input[data-p]'),function(i){var p=i.getAttribute('data-p');c[p]=c[p]||{claves:['','','','','']};
+  if(i.hasAttribute('data-i'))c[p].claves[+i.getAttribute('data-i')]=i.value.trim();else c[p][i.getAttribute('data-c')]=i.value.trim()});
+ var msg=document.getElementById('ghMsg');msg.textContent='Guardando…';
+ try{var j=await puente('claves_guardar',{admin:document.getElementById('ghAdm').value,cambios:c});var habia=hayIA();ESTADO.ia=j.ia;pinta();msg.textContent='Guardado.';
+  if(habia!==hayIA())setTimeout(function(){location.reload()},600);else setTimeout(function(){m.hidden=true},700)}
+ catch(e){msg.textContent=e.codigo==='admin'?'La clave de administrador no es correcta.':(e.message||'No se pudo guardar.')}}
+async function entrar(){var i=document.getElementById('ghClave'),v=(i.value||'').trim();if(!v)return;CLAVE=v;
+ var b=document.getElementById('ghEnt');b.disabled=true;b.textContent='Entrando…';
+ try{await puente('ping');try{localStorage.setItem('vof_clave_equipo',v)}catch(e){}location.reload()}
+ catch(e){b.disabled=false;b.textContent='Entrar';aviso(e.codigo==='clave'?'Esa clave no es correcta.':(e.message||'No se pudo conectar.'))}}
+function aviso(t){var d=document.getElementById('ghAviso');if(d){d.querySelector('span').textContent=t;d.hidden=!t}}
+
 document.addEventListener('DOMContentLoaded',async function(){
  await LISTO;
  var bar=document.createElement('div');bar.id='ghBar';
- bar.innerHTML='<button type="button" id="ghCar">'+(PERM==='granted'?'Carpeta: '+RAIZ.name+' ✓':PERM==='prompt'?'Dar permiso a la carpeta '+RAIZ.name:'Conectar carpeta VOF CAMP')+'</button>'+
-  '<button type="button" id="ghCla">Claves de IA</button><span id="ghIA"></span>'+
-  '<div id="ghAviso" hidden><span></span> <button type="button" onclick="this.parentNode.hidden=true">✕</button></div>';
+ bar.innerHTML=ESTADO.ok?
+  '<span class="ghok">● Conectado al Drive de VOF CAMP</span><button type="button" id="ghCla">Claves de IA</button><span id="ghIA"></span><button type="button" id="ghSal" class="ghsal">Salir</button>':
+  '<b>Clave del equipo</b><input type="password" id="ghClave" placeholder="Escribe la clave del equipo" autocomplete="current-password"><button type="button" id="ghEnt">Entrar</button>';
+ bar.innerHTML+='<div id="ghAviso" hidden><span></span></div>';
  document.body.insertBefore(bar,document.body.firstChild);
  var m=document.createElement('div');m.id='ghCfg';m.hidden=true;
- m.innerHTML='<div class="ghw"><div class="ghh"><b>Claves de IA</b><span class="mu">Se usan en orden: Gemini 1→5, OpenRouter 1→5, Cloudflare 1→5. Si una se queda sin cupo o falla, pasa sola a la siguiente. Se guardan solo en este navegador.</span></div><div class="ghb"></div>'+
+ m.innerHTML='<div class="ghw"><div class="ghh"><b>Claves de IA</b><span class="mu">Se usan en orden: Gemini 1→5, OpenRouter 1→5, Cloudflare 1→5. Si una se queda sin cupo o falla, pasa sola a la siguiente.</span></div><div class="ghb"></div>'+
   '<div class="ghf"><button type="button" id="ghGua">Guardar</button><button type="button" id="ghCer">Cerrar</button></div></div>';
  document.body.appendChild(m);
- document.getElementById('ghCar').onclick=conectar;
- document.getElementById('ghCla').onclick=modal;
- document.getElementById('ghCer').onclick=function(){m.hidden=true};
  m.onclick=function(e){if(e.target===m)m.hidden=true};
- document.getElementById('ghGua').onclick=function(){var tenia=hayIA();
-  [].forEach.call(m.querySelectorAll('input'),function(i){var p=CFG[i.getAttribute('data-p')];if(i.hasAttribute('data-i'))p.claves[+i.getAttribute('data-i')]=i.value.trim();else p[i.getAttribute('data-c')]=i.value.trim()});
-  guardarCfg();FRIO={};m.hidden=true;pinta();if(tenia!==hayIA())location.reload()};
- pinta();
- if(PERM!=='granted')alerta(PERM==='prompt'?'Toca "Dar permiso a la carpeta" para leer los Excel y las actas.':'Toca "Conectar carpeta VOF CAMP" y escoge G:\\Mi unidad\\VOF CAMP.');
+ document.getElementById('ghCer').onclick=function(){m.hidden=true};
+ document.getElementById('ghGua').onclick=guardarClaves;
+ if(ESTADO.ok){document.getElementById('ghCla').onclick=modalClaves;
+  document.getElementById('ghSal').onclick=function(){try{localStorage.removeItem('vof_clave_equipo')}catch(e){}location.reload()};pinta()}
+ else{document.getElementById('ghEnt').onclick=entrar;document.getElementById('ghClave').onkeydown=function(e){if(e.key==='Enter')entrar()};
+  aviso(!URL_P?'Falta poner la dirección del Apps Script en config.js (pasos en el README).':ESTADO.err||'Escribe la clave del equipo para ver la información.')}
 });
 })();
