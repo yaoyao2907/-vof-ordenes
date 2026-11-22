@@ -53,13 +53,19 @@ Cámbiala en las Propiedades del script. Los analistas tendrán que escribir la 
 Archivos: `index.html` (página), `config.js` (URL del puente), `gh.js` (conexión con el puente),
 `res.js`, `vid.js`, `chk.js`, `est.js` y sus `.css`, y `apps-script/Codigo.gs` (va en Google, no en GitHub).
 
-## Validar IA (versión nueva)
-- Al abrir una orden se sacan las fotos del PDF del acta y se guardan en Drive: `VOF CAMP/FOTOS/<orden>/`. La próxima vez se cargan de ahí.
-- Revisión foto por foto: tipo (Conos, Fachada, Papelógrafo…), Conforme / No conforme y observación. Teclas ← → C N Esc.
-- Todo se guarda al instante en el puente (`vchk/<orden>`), así que se ve igual desde cualquier PC.
-- Botón **Finalizar orden**: guarda fecha, hora y analista. Se puede reabrir.
-- **Verificar seriales**: primero intenta leer el código de barras con ZXing y, si no puede, usa la IA del puente (`gemini-flash-latest`). El resultado queda guardado para no volver a gastar cupo.
-- Proveedores de IA en "Claves de IA": Gemini, Groq, OpenRouter y Cloudflare, con 5 claves cada uno y cambio automático.
+## Validar IA
+- Al abrir una orden se ven las fotos apenas salen. Se buscan en este orden: el navegador (caché), luego Drive (`VOF CAMP/FOTOS/<orden>/`) y por último el PDF del acta.
+- Las fotos se guardan en el navegador y en Drive, una por una, junto con `acta.jpg` (el acta recortada). Si la subida falla, sale el error y un botón Reintentar.
+- Precarga en fila: cuando termina la orden abierta, carga la siguiente, después la otra, hasta 3 adelante y de a una.
+- Visor en 3 columnas:
+  - Izquierda: el acta recortada (clic para ampliar; se puede ocultar).
+  - Centro: la foto, con zoom con la rueda del mouse donde está el puntero, arrastrar, doble clic, girar ⟲ ⟳ (el giro se recuerda) y Ajustar.
+  - Derecha: los 14 ítems.
+- 14 ítems, cada uno Conforme / No conforme / No aplica, con observación. Tocar el nombre del ítem marca la foto actual como de ese ítem.
+- Teclas: ← → pasar · C / N / A estado · R girar · Esc cerrar.
+- Todo se guarda al instante en el puente (`vchk/<orden>`).
+- **Finalizar orden**: guarda fecha, hora y analista. Se puede reabrir.
+- **Verificar seriales**: primero intenta con ZXing y después con la IA del puente.
 
 ## Actualizar
 1. Sube a GitHub: index.html, gh.js, gh.css, chk.js, chk.css, README.md. **No subas config.js**, porque ahí está tu URL.
