@@ -54,6 +54,9 @@ sample.json=async function(texto,opt){
  try{var j=await puente('ia',{texto:texto,imagenes:imgs});ESTADO.ult=j.usado||'';ESTADO.iaErr=j.aviso||'';pinta();return j.datos}
  catch(e){ESTADO.iaErr=e.message||'falló';pinta();throw{code:'rate_limited',message:ESTADO.iaErr}}};
 
+window.vofPuente=function(a,d){return puente(a,d)};
+window.vofListo=function(){return LISTO.then(function(){return ESTADO.ok})};
+window.vofIA=function(){return hayIA()};
 window.claude={use:async function(n){await LISTO;if(!ESTADO.ok)return null;
  if(n==='mcp')return MCP;if(n==='db')return DB;if(n==='sample')return hayIA()?sample:null;return null}};
 
@@ -65,7 +68,7 @@ function pinta(){var e=document.getElementById('ghIA');if(!e)return;
  e.textContent=n?('IA: '+n+' clave'+(n>1?'s':'')+(ESTADO.ult?' · usando '+ESTADO.ult:'')+(ESTADO.iaErr?' · ⚠ '+ESTADO.iaErr:'')):'IA: sin claves (las pone el administrador)'}
 function modalClaves(){var m=document.getElementById('ghCfg'),ia=ESTADO.ia||{};
  m.querySelector('.ghb').innerHTML='<label class="ghadm">Clave de administrador<input type="password" id="ghAdm" autocomplete="off"></label>'+
-  ['gemini','openrouter','cloudflare'].map(function(p){var x=ia[p]||{guardadas:[]};
+  Object.keys(ia).map(function(p){var x=ia[p]||{guardadas:[]};
   return'<fieldset><legend>'+esc(x.nombre||p)+'</legend>'+[0,1,2,3,4].map(function(i){var g=(x.guardadas||[])[i];
    return'<label>Clave '+(i+1)+(g?' <b class="ghok">guardada</b>':'')+'<input type="password" autocomplete="off" data-p="'+p+'" data-i="'+i+'" placeholder="'+(g?'(dejar igual)':'pega la clave')+'"></label>'}).join('')+
    (p==='cloudflare'?'<label>ID de cuenta<input type="text" data-p="cloudflare" data-c="cuenta" value="'+esc(x.cuenta||'')+'"></label>':'')+
@@ -94,7 +97,7 @@ document.addEventListener('DOMContentLoaded',async function(){
  bar.innerHTML+='<div id="ghAviso" hidden><span></span></div>';
  document.body.insertBefore(bar,document.body.firstChild);
  var m=document.createElement('div');m.id='ghCfg';m.hidden=true;
- m.innerHTML='<div class="ghw"><div class="ghh"><b>Claves de IA</b><span class="mu">Se usan en orden: Gemini 1→5, OpenRouter 1→5, Cloudflare 1→5. Si una se queda sin cupo o falla, pasa sola a la siguiente.</span></div><div class="ghb"></div>'+
+ m.innerHTML='<div class="ghw"><div class="ghh"><b>Claves de IA</b><span class="mu">Se usan en orden: Gemini 1→5, Groq 1→5, OpenRouter 1→5, Cloudflare 1→5. Si una se queda sin cupo o falla, pasa sola a la siguiente.</span></div><div class="ghb"></div>'+
   '<div class="ghf"><button type="button" id="ghGua">Guardar</button><button type="button" id="ghCer">Cerrar</button></div></div>';
  document.body.appendChild(m);
  m.onclick=function(e){if(e.target===m)m.hidden=true};

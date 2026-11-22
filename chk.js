@@ -1,90 +1,105 @@
-/* VOF Órdenes – pestaña VALIDAR IA: checklist foto por foto (diseño 4, bandeja de pendientes).
-   Las fotos salen del PDF del acta (Drive ORDENES o un PDF del computador); la IA (Claude, capacidad sample)
-   las ordena por tipo y lee seriales y papelógrafos; el analista marca Sí / No / No aplica en cada paso.
-   Las respuestas se guardan en la base de la página (las ve todo el equipo). */
+/* VOF Órdenes (versión GitHub) – pestaña VALIDAR IA: galería de fotos del acta y revisión foto por foto.
+   - Las fotos se sacan del PDF del acta (sin IA) y se guardan en Drive: VOF CAMP/FOTOS/<orden>/foto_01.jpg …
+     La próxima vez se cargan de ahí, sin volver a abrir el PDF.
+   - En cada foto el analista marca el tipo (conos, fachada…) y Conforme / No conforme + observación.
+   - Todo se guarda al instante en la base del puente (vchk/<orden>): lo ve todo el equipo, desde cualquier PC.
+   - "Finalizar orden" la cierra (con fecha, hora y quién); se puede reabrir.
+   - La IA solo se usa para leer el serial del medidor INSTALADO cuando el código de barras no se lee. */
 (function(){
 var X=window.VOFX;if(!X)return;
 var $=X.$,esc=X.esc,toast=X.toast;
-var PASOS=[
- {k:'conos',n:'Conos',d:'Señalización de la zona de trabajo'},
- {k:'fachada',n:'Fachada',d:'Frente del predio con el papelógrafo'},
- {k:'papelografo',n:'Papelógrafo',d:'Orden (OS), NIC y fecha escritos'},
- {k:'pruebas',n:'Pruebas',d:'Pinza (voltaje y carga), ABM, equipo patrón y censo'},
- {k:'irregularidad',n:'Irregularidad',d:'Fotos que muestran la anomalía o donde el papelógrafo la escribe'},
- {k:'medidor_encontrado',n:'Medidor encontrado',d:'Serial del medidor que se retira'},
- {k:'medidor_instalado',n:'Medidor instalado',d:'Serial del medidor nuevo'},
- {k:'bolsa',n:'Bolsa de custodia',d:'Serial de la bolsa instalada'},
- {k:'finales',n:'Fotos finales',d:'Servicio normalizado: medidor nuevo instalado y sellado'},
- {k:'constancia',n:'Constancia de visita',d:'Acta en papel: fecha, OS, NIC y hallazgos'},
- {k:'otras',n:'Otras fotos',d:'Las que no entraron en ningún paso'}];
-var TIPOS=PASOS.map(function(p){return p.k}).filter(function(k){return k!=='otras'});
-var R={SI:'Sí',NO:'No',NA:'No aplica'};
+var TIPOS=[['conos','Conos'],['fachada','Fachada'],['papelografo','Papelógrafo'],['pruebas','Pruebas'],['irregularidad','Irregularidad'],
+ ['medidor_encontrado','Medidor encontrado'],['medidor_instalado','Medidor instalado'],['bolsa','Bolsa'],['finales','Fotos finales'],['constancia','Constancia'],['otra','Otra']];
+var TN={};TIPOS.forEach(function(t){TN[t[0]]=t[1]});
+var EST={C:'Conforme',NC:'No conforme'};
+var SER={CONFORME:'Serial conforme','NO CONFORME':'Serial no conforme','SIN LEER':'Serial sin leer','NO APLICA':'Sin cambio de medidor'};
 var sec=document.createElement('section');sec.id='tChk';sec.hidden=true;
 var ref=$('tVid')||$('tHis');ref.parentNode.insertBefore(sec,ref);
 sec.innerHTML=
- '<div class="khd"><span class="dot" id="kDot"></span><b>Validar IA · checklist foto por foto</b><span class="mu" id="kInfo">Carga el resultado para ver las órdenes.</span><span style="flex:1"></span>'+
+ '<div class="khd"><b>Validar IA · revisión de fotos</b><span class="mu" id="kInfo">Carga el resultado para ver las órdenes.</span><span style="flex:1"></span>'+
+ '<label class="kan">Analista <input id="kAna" placeholder="Tu nombre" autocomplete="name"></label>'+
  '<button class="b s" id="kPdf" type="button">Abrir PDF del computador</button><input type="file" id="kFi" accept=".pdf" hidden></div>'+
  '<div class="kf"><div class="kseg" id="kDia"><button type="button" data-v="hoy">Hoy</button><button type="button" data-v="ayer">Ayer</button><button type="button" data-v="" class="on">Todos</button></div>'+
- '<div class="kseg" id="kEst"><button type="button" data-v="pend" class="on">Pendientes</button><button type="button" data-v="rev">Revisadas</button><button type="button" data-v="">Todas</button></div>'+
- '<select id="kTec" aria-label="Técnico"><option value="">Técnico: todos</option></select><input type="search" id="kQ" placeholder="Buscar orden, NIC o técnico" aria-label="Buscar orden"></div>'+
+ '<div class="kseg" id="kEst"></div>'+
+ '<select id="kTec" aria-label="Técnico"><option value="">Técnico: todos</option></select>'+
+ '<select id="kMo" aria-label="Mano de obra"><option value="">Mano de obra: todas</option></select>'+
+ '<input type="search" id="kQ" placeholder="Buscar orden, NIC o técnico" aria-label="Buscar orden"></div>'+
+ '<div class="kf ks2"><span class="mu sm">Seriales del medidor instalado:</span><div class="kseg" id="kSer"></div>'+
+ '<button class="b s" id="kVer" type="button">Verificar seriales</button><span class="mu sm" id="kVerI"></span></div>'+
  '<div class="kbox"><aside class="klst" id="kLst"></aside><div class="kdet" id="kDet"></div></div>'+
- '<div class="klb" id="kLb" hidden><button type="button" class="kx" id="kLbX" aria-label="Cerrar">✕</button><button type="button" class="kav" id="kLbP" aria-label="Anterior">‹</button><img id="kLbI" alt="Foto del acta"><button type="button" class="kav" id="kLbN" aria-label="Siguiente">›</button><div class="kcap" id="kLbC"></div></div>';
+ '<div class="klb" id="kLb" hidden><button type="button" class="kx" id="kLbX" aria-label="Cerrar">✕</button>'+
+ '<div class="klbw"><div class="klbf"><button type="button" class="kav" id="kLbP" aria-label="Foto anterior">‹</button><img id="kLbI" alt="Foto del acta"><button type="button" class="kav" id="kLbN" aria-label="Foto siguiente">›</button><div class="kcap" id="kLbC"></div></div>'+
+ '<div class="klbp" id="kLbPan"></div></div></div>';
 
-var ORD=[],K={},CUR=null,FILT={dia:'',est:'pend',tec:'',q:''},DRV=null,arr=false,LB={l:[],i:0};
-try{K=JSON.parse(localStorage.getItem('vof_chk')||'{}')||{}}catch(e){K={}}
-function guardarLocal(){try{localStorage.setItem('vof_chk',JSON.stringify(K))}catch(e){}}
+var ORD=[],K={},CUR=null,FILT={dia:'',est:'',tec:'',mo:'',q:'',ser:''},DRV=null,arr=false,LBI=-1,VER=null;
+try{K=JSON.parse(localStorage.getItem('vof_chk2')||'{}')||{}}catch(e){K={}}
+try{$('kAna').value=localStorage.getItem('vof_analista')||''}catch(e){}
+function ana(){return($('kAna').value||'').trim()}
+$('kAna').onchange=function(){try{localStorage.setItem('vof_analista',ana())}catch(e){}};
+function guardarLocal(){try{localStorage.setItem('vof_chk2',JSON.stringify(K))}catch(e){}}
 function rv(r,k){var v=r[k];return v==null?'':String(v).trim()}
 function fk(f){var m=String(f).match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);return m?m[3]+('0'+m[2]).slice(-2)+('0'+m[1]).slice(-2):''}
 function dk(d){return d.getFullYear()+('0'+(d.getMonth()+1)).slice(-2)+('0'+d.getDate()).slice(-2)}
 function L(s){return String(s==null?'':s).toUpperCase().replace(/[^A-Z0-9]/g,'').replace(/^0+/,'')}
 function igual(a,b){a=L(a);b=L(b);if(!a||!b||b.length<4)return null;return a===b||(b.length>=6&&(a.indexOf(b)>=0||b.indexOf(a)>=0))}
-function est(o){var k=K[o];return k&&k.estado?k.estado:(k&&k.resp&&Object.keys(k.resp).length?'EN REVISIÓN':'PENDIENTE')}
+function kk(o){return K[o]||(K[o]={fotos:{},t:0})}
+function est(o){var k=K[o];if(!k)return'PENDIENTE';if(k.fin)return'FINALIZADA';return k.fotos&&Object.keys(k.fotos).some(function(i){return k.fotos[i].tipo||k.fotos[i].e||k.fotos[i].obs})?'EN REVISIÓN':'PENDIENTE'}
+function fechaCorta(t){try{return new Date(t).toLocaleString('es-CO',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}catch(e){return''}}
 
-/* ---------- base de la página (compartida) ---------- */
+/* ---------- base del puente (compartida) ---------- */
 function db(){return X.db&&X.db()}
-var tGuardar={};
-function subir(o){var d=db();if(!d)return;clearTimeout(tGuardar[o]);tGuardar[o]=setTimeout(function(){
- var k=K[o];if(!k)return;try{d.doc('vchk/'+o).set(JSON.parse(JSON.stringify(k))).then(null,function(){toast('No se pudo guardar en la página; quedó en este navegador.',true)})}catch(e){}},700)}
+var tG={};
+function subir(o){var d=db();if(!d)return;clearTimeout(tG[o]);tG[o]=setTimeout(function(){var k=K[o];if(!k)return;
+ d.doc('vchk/'+o).set(JSON.parse(JSON.stringify(k))).then(function(){$('kInfo').dataset.err=''},function(){toast('No se pudo guardar en la nube; quedó en este navegador y se reintenta.',true);setTimeout(function(){subir(o)},15000)})},900)}
 async function bajarTodo(){var d=db();if(!d)return;
- try{var r=await Promise.race([d.collection('vchk').get(),new Promise(function(ok){setTimeout(function(){ok(null)},10000)})]);if(!r)return;
-  r.docs.forEach(function(x){var v=x.data()||{};if(!K[x.id]||(v.t||0)>=(K[x.id].t||0))K[x.id]=v});guardarLocal();lista()}catch(e){}}
+ try{var r=await Promise.race([d.collection('vchk').get(),new Promise(function(ok){setTimeout(function(){ok(null)},20000)})]);if(!r)return;
+  r.docs.forEach(function(x){var v=x.data()||{};if(v.resp&&!v.fotos)return;               /* formato viejo de pasos: se ignora */
+   if(!K[x.id]||(v.t||0)>=(K[x.id].t||0))K[x.id]=v});guardarLocal();lista();if(CUR&&!LBabierto())pintar()}catch(e){}}
+function LBabierto(){return!$('kLb').hidden}
 
 /* ---------- órdenes (del resultado) ---------- */
 window.kDatos=function(){
  var A=window.rFilas?window.rFilas():[];
  ORD=A.filter(function(r){var o=rv(r,'Orden'),i=rv(r,'IRREGULARIDAD');return /^\d{6,}$/.test(o)&&i!=='NO SE VALIDA'&&i!=='LIBERADA'&&rv(r,'Resultado')!=='LIBERADA'})
-  .map(function(r){return{o:rv(r,'Orden'),nic:rv(r,'NIC'),tec:rv(r,'Técnico'),fecha:rv(r,'Fecha'),hora:rv(r,'Hora'),k:fk(rv(r,'Fecha')),irr:rv(r,'IRREGULARIDAD'),tipo:rv(r,'TIPO DE IRRE'),medEnc:rv(r,'MEDIDOR ENCONTRADO')}});
+  .map(function(r){return{o:rv(r,'Orden'),nic:rv(r,'NIC'),tec:rv(r,'Técnico'),fecha:rv(r,'Fecha'),hora:rv(r,'Hora'),k:fk(rv(r,'Fecha')),irr:rv(r,'IRREGULARIDAD'),
+   mo:rv(r,'Mano de obra').split(/\s*\|\s*/).map(function(x){return x.trim()}).filter(Boolean),medEnc:rv(r,'MEDIDOR ENCONTRADO')}});
  var u={};ORD=ORD.filter(function(x){if(u[x.o])return false;u[x.o]=1;return true});
  ORD.sort(function(a,b){return(a.k+a.hora).localeCompare(b.k+b.hora)});
- var ts={};ORD.forEach(function(x){if(x.tec)ts[x.tec]=1});
+ var ts={},ms={};ORD.forEach(function(x){if(x.tec)ts[x.tec]=1;x.mo.forEach(function(m){ms[m]=(ms[m]||0)+1})});
  $('kTec').innerHTML='<option value="">Técnico: todos</option>'+Object.keys(ts).sort().map(function(t){return'<option'+(t===FILT.tec?' selected':'')+'>'+esc(t)+'</option>'}).join('');
+ var mk=Object.keys(ms).sort(function(a,b){var ia=/^INST/i.test(a),ib=/^INST/i.test(b);return ia!==ib?(ia?-1:1):a.localeCompare(b)});
+ $('kMo').innerHTML='<option value="">Mano de obra: todas</option>'+mk.map(function(m){return'<option value="'+esc(m)+'"'+(m===FILT.mo?' selected':'')+'>'+esc(m)+' ('+ms[m]+')</option>'}).join('');
  $('kInfo').textContent=ORD.length?ORD.length+' órdenes con acta en el resultado.':'El resultado no trae órdenes con acta.';
  lista()};
-function filtradas(){var h=new Date(),hoy=dk(h);h.setDate(h.getDate()-1);var ayer=dk(h);var q=FILT.q.toLowerCase();
+function base(sinEst,sinSer){var h=new Date(),hoy=dk(h);h.setDate(h.getDate()-1);var ayer=dk(h),q=FILT.q.toLowerCase();
  return ORD.filter(function(x){if(FILT.dia==='hoy'&&x.k!==hoy)return false;if(FILT.dia==='ayer'&&x.k!==ayer)return false;
-  var e=est(x.o);if(FILT.est==='pend'&&(e==='CONFORME'||e==='NO CONFORME'))return false;if(FILT.est==='rev'&&!(e==='CONFORME'||e==='NO CONFORME'))return false;
-  if(FILT.tec&&x.tec!==FILT.tec)return false;if(q&&(x.o+' '+x.nic+' '+x.tec).toLowerCase().indexOf(q)<0)return false;return true})}
+  if(FILT.tec&&x.tec!==FILT.tec)return false;if(FILT.mo&&x.mo.indexOf(FILT.mo)<0)return false;
+  if(q&&(x.o+' '+x.nic+' '+x.tec).toLowerCase().indexOf(q)<0)return false;
+  if(!sinEst&&FILT.est&&est(x.o)!==FILT.est)return false;
+  if(!sinSer&&FILT.ser){var s=(K[x.o]||{}).serial;if(FILT.ser==='SIN VERIFICAR'?!!s:!(s&&s.res===FILT.ser))return false}
+  return true})}
+function contadores(){
+ var B=base(true,false),c={'':B.length,PENDIENTE:0,'EN REVISIÓN':0,FINALIZADA:0};B.forEach(function(x){c[est(x.o)]++});
+ $('kEst').innerHTML=[['','Todas'],['PENDIENTE','Pendientes'],['EN REVISIÓN','En revisión'],['FINALIZADA','Finalizadas']].map(function(e){
+  return'<button type="button" data-v="'+e[0]+'" class="'+(FILT.est===e[0]?'on':'')+'">'+e[1]+' <b>'+c[e[0]]+'</b></button>'}).join('');
+ var S=base(false,true),s={'':S.length,CONFORME:0,'NO CONFORME':0,'SIN LEER':0,'SIN VERIFICAR':0};
+ S.forEach(function(x){var r=(K[x.o]||{}).serial;if(!r)s['SIN VERIFICAR']++;else if(s[r.res]!==undefined)s[r.res]++});
+ $('kSer').innerHTML=[['','Todos'],['CONFORME','Conformes'],['NO CONFORME','No conformes'],['SIN LEER','Sin leer'],['SIN VERIFICAR','Sin verificar']].map(function(e){
+  return'<button type="button" data-v="'+e[0]+'" class="'+(FILT.ser===e[0]?'on':'')+(e[0]==='NO CONFORME'&&s[e[0]]?' rojo':'')+'">'+e[1]+' <b>'+s[e[0]]+'</b></button>'}).join('');
+ var fin=c.FINALIZADA;return{fin:fin,tot:B.length}}
 function lista(){
- var F=filtradas();
- $('kLst').innerHTML='<div class="klh">'+F.length+' órdenes</div>'+(F.slice(0,400).map(function(x){var e=est(x.o),k=K[x.o]||{},n=Object.keys(k.resp||{}).length;
-  return'<button type="button" class="kit'+(CUR&&CUR.o===x.o?' on':'')+'" data-o="'+esc(x.o)+'"><b>'+esc(x.o)+'</b> <span class="mu">'+esc(x.fecha.slice(0,5))+' '+esc(x.hora.slice(0,5))+'</span><br><span class="sm">'+esc(x.tec||'(sin técnico)')+'</span>'+
-   '<span class="kpr"><i style="width:'+Math.round(n*100/PASOS.length)+'%"></i></span><span class="ke '+(e==='CONFORME'?'ok':e==='NO CONFORME'?'er':e==='EN REVISIÓN'?'wn':'')+'">'+e+'</span></button>'}).join('')||'<p class="mu" style="padding:12px">No hay órdenes con estos filtros.</p>')}
+ var cc=contadores(),F=base();
+ $('kLst').innerHTML='<div class="klh">'+F.length+' órdenes · <b>'+cc.fin+'</b> finalizadas de '+cc.tot+'</div>'+(F.slice(0,500).map(function(x){var e=est(x.o),k=K[x.o]||{},n=Object.keys(k.fotos||{}).filter(function(i){return k.fotos[i].tipo||k.fotos[i].e}).length,s=k.serial;
+  return'<button type="button" class="kit'+(CUR&&CUR.o===x.o?' on':'')+'" data-o="'+esc(x.o)+'"><b>'+esc(x.o)+'</b> <span class="mu">'+esc(x.fecha.slice(0,5))+' '+esc(x.hora.slice(0,5))+'</span><br><span class="sm">'+esc(x.tec||'(sin técnico)')+'</span><br>'+
+   '<span class="ke '+(e==='FINALIZADA'?'ok':e==='EN REVISIÓN'?'wn':'')+'">'+e+'</span>'+(n?' <span class="mu sm">'+n+' foto'+(n>1?'s':'')+' marcada'+(n>1?'s':'')+'</span>':'')+
+   (s?' <span class="ksr '+(s.res==='CONFORME'?'ok':s.res==='NO CONFORME'?'er':'')+'">'+(s.res==='CONFORME'?'serial ✓':s.res==='NO CONFORME'?'serial ✗':s.res==='SIN LEER'?'serial ?':'sin cambio')+'</span>':'')+'</button>'}).join('')||'<p class="mu" style="padding:12px">No hay órdenes con estos filtros.</p>')}
 
-/* ---------- PDF: texto y fotos ---------- */
+/* ---------- fotos: Drive (FOTOS/<orden>) o el PDF del acta ---------- */
 async function pdfDe(o){
- if(!X.mcp())throw new Error('La carpeta VOF CAMP no está conectada: toca "Conectar carpeta VOF CAMP" arriba, o usa "Abrir PDF del computador".');
+ if(!X.mcp())throw new Error('No hay conexión con el Drive: escribe la clave del equipo arriba, o usa "Abrir PDF del computador".');
  if(!DRV||Date.now()-DRV.t>300000){var l=await X.drLista(X.DR.ord);DRV={t:Date.now(),m:{}};l.forEach(function(f){DRV.m[String(f.title||'').replace(/\.pdf$/i,'')]=f})}
  var f=DRV.m[o];if(!f)throw new Error('No está el PDF '+o+'.pdf en la carpeta ORDENES.');
  return X.drBytes(f.id,[37,80,68,70])}
-/* precarga: PDF + fotos de las siguientes órdenes, para que abran de una */
-var PRE={},PREL=[];
-function preparar(o){if(PRE[o])return PRE[o];
- PRE[o]=pdfDe(o).then(function(u8){var url=URL.createObjectURL(new Blob([u8],{type:'application/pdf'}));return leerPdf(u8).then(function(d){d.pdfUrl=url;return d})}).then(function(d){return d},function(e){delete PRE[o];throw e});
- PREL.push(o);var vueltas=0;while(PREL.length>5&&vueltas++<10){var v=PREL.shift();if(CUR&&CUR.o===v){PREL.push(v);continue}var q=PRE[v];delete PRE[v];if(q)q.then(function(d){d.fotos.forEach(function(f){URL.revokeObjectURL(f.u)})},function(){})}
- return PRE[o]}
-function precargar(){if(!CUR||!X.mcp())return;var F=filtradas().filter(function(y){var e=est(y.o);return e!=='CONFORME'&&e!=='NO CONFORME'}),i=F.findIndex(function(y){return y.o===CUR.o});
- var sig=F.slice(i+1,i+4);if(!sig.length)return;
- (async function(){for(var k=0;k<sig.length;k++){try{var d=await preparar(sig[k].o);if(k===0)await clasificarDe(sig[k].o,d,true)}catch(e){}}})()}
 function aCanvas(img){var c=document.createElement('canvas');
  if(img.bitmap){c.width=img.bitmap.width;c.height=img.bitmap.height;c.getContext('2d').drawImage(img.bitmap,0,0);return c}
  var w=img.width,h=img.height,d=img.data;if(!d||!w||!h)return null;c.width=w;c.height=h;var cx=c.getContext('2d'),id=cx.createImageData(w,h),p=id.data,n=w*h;
@@ -111,131 +126,174 @@ async function leerPdf(u8){
   pg.cleanup()}
  pdf.destroy();return{fotos:fotos,acta:acta||{},bolsa:bolsa}}
 
-/* ---------- IA: ordenar fotos y leer datos ---------- */
-var PROMPT='Eres analista de calidad de Grupo SYM (contratista de Air-e, energía). Te paso las fotos de UNA visita, numeradas en el orden en que vienen (foto 1 = la primera imagen adjunta).\n'+
- 'Clasifica CADA foto en uno de estos tipos:\n conos (conos/cinta de señalización), fachada (frente del predio), papelografo (el cartel/hoja que sostiene el técnico con OS, NIC y fecha; úsalo solo si la foto es sobre todo el papelógrafo), '+
- 'pruebas (pinza amperimétrica midiendo voltaje o carga, equipo patrón EmsiTech/ABM conectado o su pantalla, app con % de error, calculadora del censo de carga), irregularidad (muestra la anomalía reportada o el papelógrafo la escribe), '+
- 'medidor_encontrado (el medidor VIEJO que se retira, o sus sellos), medidor_instalado (el medidor NUEVO, con su serial o código de barras), bolsa (bolsa de custodia), finales (cómo quedó el servicio normalizado: medidor nuevo instalado y sellado, acometida arreglada), '+
- 'constancia (la hoja "Constancia de visita" o el acta en papel, por delante o por detrás), descartar (logos, firmas, pantallazos sin relación), otras (no encaja en nada).\n'+
- 'Además lee lo que se vea. Responde SOLO un JSON: {"fotos":[{"i":1,"tipo":"conos"}...],"lecturas":{"conos_visibles":true|false|null,"fachada_visible":true|false|null,'+
- '"papel_os":"","papel_nic":"","papel_fecha":"","pct_error":"","medidor_equipo":"","anomalia_visible":true|false|null,"anomalia_texto":"","med_encontrado":"","med_instalado":"","bolsa":"",'+
- '"finales_ok":true|false|null,"const_fecha":"","const_os":"","const_nic":"","const_hallazgos":[]}}. Usa null o "" en lo que no se vea. No inventes números: copia solo lo que se lee.\n'+
- 'Datos del acta (para saber qué buscar, no para copiarlos): orden {O}; anomalías del acta: {A}.';
-async function clasificar(){
- var S=X.sample&&X.sample();if(!CUR||!CUR.fotos.length)return;
- if(!S){CUR.msg='No hay claves de IA: toca "Claves de IA" arriba. Mientras tanto las fotos quedan en "Otras fotos".';pintar();return}
- var o=CUR.o;CUR.msg='La IA está ordenando '+CUR.fotos.length+' fotos…';pintar();
- try{await clasificarDe(o,{fotos:CUR.fotos,acta:CUR.acta||{}});if(CUR&&CUR.o===o&&CUR.msg){CUR.msg='';pintar()}}
- catch(e){if(CUR&&CUR.o===o){CUR.msg=(e&&e.message)||'La IA no respondió: las fotos quedan en "Otras fotos".';pintar()}}}
-var IAP={};
-function clasificarDe(o,d,fondo){if(IAP[o])return IAP[o];IAP[o]=clasificarDe2(o,d,fondo);IAP[o].then(function(){delete IAP[o]},function(){delete IAP[o]});return IAP[o]}
-async function clasificarDe2(o,d,fondo){var k=K[o]||(K[o]={resp:{},notas:{}});if(k.ia&&k.ia.n===d.fotos.length)return;
- var S=X.sample&&X.sample();if(!S||!d.fotos.length)return;var lim=await S.limits().catch(function(){return null}),max=lim&&lim.images?lim.images.maxCount:0;if(!max)return;
- var anom=(d.acta.irr||[]).map(function(i){return i.n+' '+i.nombre}).join(' · ')||'SIN ANOMALÍA',tipos={},lec={};
- for(var i=0;i<d.fotos.length;i+=max){var lote=d.fotos.slice(i,i+max);var blobs=await Promise.all(lote.map(achicar));
-  var p=PROMPT.replace('{O}',o).replace('{A}',anom)+(d.fotos.length>max?'\nOjo: van las fotos '+(i+1)+' a '+(i+lote.length)+' de '+d.fotos.length+'; numera desde '+(i+1)+'.':'');
-  var j=await S.json(p,{images:blobs});mezclar(j,tipos,lec,d.fotos.length)}
- k.ia={n:d.fotos.length,tipos:tipos,lec:lec,t:Date.now()};k.t=Date.now();guardarLocal();subir(o);if(CUR&&CUR.o===o)aplicarIA()}
-function achicar(f){return new Promise(function(ok){var im=new Image();im.onload=function(){var c=document.createElement('canvas');c.width=im.width;c.height=im.height;c.getContext('2d').drawImage(im,0,0);aBlob(c,900,0.8).then(ok)};im.onerror=function(){ok(f.b)};im.src=f.u})}
-function mezclar(j,tipos,lec,n){(j&&j.fotos||[]).forEach(function(x){var m=+x.i;if(m>=1&&m<=n&&TIPOS.concat(['descartar','otras']).indexOf(x.tipo)>=0)tipos[m-1]=x.tipo});
- var l=j&&j.lecturas||{};Object.keys(l).forEach(function(c){var v=l[c];if(v!==null&&v!==''&&!(Array.isArray(v)&&!v.length)&&(lec[c]===undefined||lec[c]===null||lec[c]===''))lec[c]=v})}
-function aplicarIA(){var k=K[CUR.o]||{};CUR.tipos=(k.ia&&k.ia.tipos)||{};CUR.lec=(k.ia&&k.ia.lec)||{};CUR.msg='';pintar()}
-function fotosPaso(pk){if(!CUR)return[];var t=CUR.tipos||{},sin=!Object.keys(t).length;
- return CUR.fotos.map(function(f,i){return{f:f,i:i}}).filter(function(x){var ti=t[x.i];if(sin)return pk==='otras';return pk==='otras'?(!ti||ti==='otras'):ti===pk})}
-
-/* ---------- comparación y sugerencia por paso ---------- */
-function chequeos(pk){var a=CUR.acta||{},l=CUR.lec||{},x=CUR.x||{},nf=fotosPaso(pk).length,r=[],sug=null;
- function fila(q,ac,ia,ok){r.push({q:q,a:ac,i:ia,ok:ok})}
- var tf=function(v){return v===true?'Sí se ve':v===false?'No se ve':''};
- if(pk==='conos'){fila('Se ven los conos y la cinta','',tf(l.conos_visibles),l.conos_visibles);sug=!nf?'NO':l.conos_visibles===false?'NO':'SI'}
- else if(pk==='fachada'){fila('Se ve la fachada con el papelógrafo','',tf(l.fachada_visible),l.fachada_visible);sug=!nf?'NO':l.fachada_visible===false?'NO':'SI'}
- else if(pk==='papelografo'){var a1=igual(x.o,l.papel_os),a2=igual(x.nic,l.papel_nic);fila('OS escrita',x.o,l.papel_os,a1);fila('NIC escrito',x.nic,l.papel_nic,a2);fila('Fecha',x.fecha,l.papel_fecha,null);
-  sug=a1===false||a2===false?'NO':a1&&a2?'SI':null}
- else if(pk==='pruebas'){fila('% de error del equipo patrón','',l.pct_error,null);var me=igual(x.medEnc||a.medEnc,l.medidor_equipo);fila('Medidor en el equipo = medidor encontrado',x.medEnc||a.medEnc,l.medidor_equipo,me);sug=!nf?'NA':me===false?'NO':'SI'}
- else if(pk==='irregularidad'){var sinA=!CUR.anom||/SIN ANOMAL/i.test(CUR.anom);fila('Anomalía del acta',CUR.anom||'SIN ANOMALÍA','',null);fila('Se ve o está escrita en la foto','',(tf(l.anomalia_visible)+(l.anomalia_texto?' · '+l.anomalia_texto:'')),l.anomalia_visible);
-  sug=sinA?'NA':l.anomalia_visible===true?'SI':l.anomalia_visible===false||!nf?'NO':null}
- else if(pk==='medidor_encontrado'){var ac=x.medEnc||a.medEnc,ok=igual(ac,l.med_encontrado);fila('Serial',ac,l.med_encontrado,ok);sug=ok===false?'NO':ok?'SI':!nf?'NO':null}
- else if(pk==='medidor_instalado'){var cm=a.cambioMed==='SI',ok2=igual(a.medInst,l.med_instalado);fila('Se cambió medidor',cm?'SI':'NO','',null);if(cm)fila('Serial',a.medInst,l.med_instalado,ok2);sug=!cm?'NA':ok2===false?'NO':ok2?'SI':null}
- else if(pk==='bolsa'){var ok3=igual(CUR.bolsa,l.bolsa);fila('Serial',CUR.bolsa||'(el acta no trae bolsa)',l.bolsa,CUR.bolsa?ok3:null);sug=!CUR.bolsa?'NA':ok3===false?'NO':ok3?'SI':null}
- else if(pk==='finales'){fila('Servicio normalizado, medidor nuevo sellado','',tf(l.finales_ok),l.finales_ok);sug=!nf?'NO':l.finales_ok===false?'NO':'SI'}
- else if(pk==='constancia'){var h=(CUR.irrN||[]).join(', '),hi=(l.const_hallazgos||[]).join(', '),c1=igual(x.o,l.const_os),c2=igual(x.nic,l.const_nic),c3=h||hi?(h===hi):null;
-  fila('Fecha',x.fecha,l.const_fecha,null);fila('OS',x.o,l.const_os,c1);fila('NIC',x.nic,l.const_nic,c2);fila('Hallazgos marcados',h||'ninguno',hi,c3);
-  sug=!nf?'NO':(c1===false||c2===false||c3===false)?'NO':(c1&&c2)?'SI':null}
- else{sug=nf?null:'NA'}
- return{rows:r,sug:sug}}
-
-/* ---------- pintar ---------- */
-function pintar(){
- if(!CUR){$('kDet').innerHTML='<div class="kvac"><b>Escoge una orden de la lista</b><p class="mu">Se abre su acta, la IA ordena las fotos por tipo y tú vas marcando Sí, No o No aplica en cada paso. Teclas: S, N, A y las flechas.</p></div>';return}
- var k=K[CUR.o]||{resp:{},notas:{}},x=CUR.x,P=CUR.paso;
- var st='<div class="kstp">'+PASOS.concat([{n:'Resumen'}]).map(function(p,i){var r=p.k?k.resp[p.k]:null,c=i===P?'kcur':r==='SI'?'ok':r==='NO'?'er':r==='NA'?'na':'';
-  return'<button type="button" class="ks '+c+'" data-p="'+i+'"><span>'+(r==='SI'?'✓':r==='NO'?'✗':r==='NA'?'—':i+1)+'</span><em>'+esc(p.n)+'</em></button>'}).join('')+'</div>';
- var cab='<div class="kch"><b>Orden '+esc(x.o)+'</b><span class="mu">NIC '+esc(x.nic)+' · '+esc(x.tec)+' · '+esc(x.fecha)+' '+esc(x.hora)+'</span>'+(CUR.link?'<a class="kpdf" href="'+esc(CUR.link)+'" target="_blank" rel="noopener">PDF</a>':'')+
-  '<button type="button" class="b s" id="kRe">Volver a ordenar con IA</button></div>';
- if(CUR.cargando){$('kDet').innerHTML=cab+st+'<div class="kvac"><span class="spin"></span> '+esc(CUR.cargando)+'</div>';return}
- if(CUR.error){$('kDet').innerHTML=cab+st+'<div class="kvac"><b>No se pudo abrir el acta</b><p class="mu">'+esc(CUR.error)+'</p></div>';return}
- var msg=CUR.msg?'<div class="kmsg">'+esc(CUR.msg)+'</div>':'';
- if(P>=PASOS.length){var todos=PASOS.every(function(p){return k.resp[p.k]}),mal=PASOS.filter(function(p){return k.resp[p.k]==='NO'});
-  $('kDet').innerHTML=cab+st+msg+'<div class="kpt"><span class="knum">RESUMEN</span><h2>'+(todos?(mal.length?'Orden NO CONFORME: '+mal.length+' paso'+(mal.length>1?'s':'')+' en No':'Orden conforme: '+PASOS.length+' de '+PASOS.length):'Faltan pasos por marcar')+'</h2></div>'+
-   '<table class="kck"><tr><th>#</th><th>Paso</th><th>Respuesta</th><th>Nota</th></tr>'+PASOS.map(function(p,i){var r=k.resp[p.k];return'<tr><td>'+(i+1)+'</td><td><b>'+esc(p.n)+'</b></td><td>'+(r?'<span class="kr '+r.toLowerCase()+'">'+R[r]+'</span>':'<span class="mu">sin marcar</span>')+'</td><td class="mu">'+esc((k.notas||{})[p.k]||'')+'</td></tr>'}).join('')+'</table>'+
-   '<div class="kfin"><button type="button" class="kbt si big" id="kApr"'+(todos?'':' disabled')+'>✓ Guardar orden y pasar a la siguiente</button><span class="mu sm">Queda '+(mal.length?'NO CONFORME':'CONFORME')+' y la ve todo el equipo en la página.'+(k.por?' Última revisión: '+esc(k.por):'')+'</span></div>';
-  return}
- var p=PASOS[P],fs=fotosPaso(p.k),c=chequeos(p.k),r=k.resp[p.k];
- var g=fs.length?'<div class="kfot n'+Math.min(fs.length,6)+'">'+fs.map(function(y,j){return'<button type="button" class="kth" data-f="'+j+'"><img src="'+y.f.u+'" alt="Foto '+(y.i+1)+'"><span>'+(y.i+1)+'</span></button>'}).join('')+'</div>':'<div class="kvac sm"><b>No hay fotos de '+esc(p.n.toLowerCase())+'</b>'+(Object.keys(CUR.tipos||{}).length?'':'<p class="mu">La IA todavía no ha ordenado las fotos.</p>')+'</div>';
- var t=c.rows.length?'<table class="kck"><tr><th>Qué se revisa</th><th>Dice el acta</th><th>Leyó la IA</th></tr>'+c.rows.map(function(z){return'<tr><td>'+esc(z.q)+'</td><td class="ka">'+(esc(z.a)||'<span class=mu>—</span>')+'</td><td class="'+(z.ok===true?'kok':z.ok===false?'kno':'')+'">'+(esc(z.i)||'<span class=mu>—</span>')+'</td></tr>'}).join('')+'</table>':'';
- var bt=['SI','NO','NA'].map(function(v){return'<button type="button" class="kbt '+v.toLowerCase()+' big'+(r===v?' on':'')+(c.sug===v&&!r?' sug':'')+'" data-r="'+v+'">'+(v==='SI'?'✓ Sí':v==='NO'?'✗ No':'— No aplica')+'</button>'}).join('');
- $('kDet').innerHTML=cab+st+msg+'<div class="kpt"><span class="knum">PASO '+(P+1)+' DE '+PASOS.length+'</span><h2>'+esc(p.n)+'</h2><span class="mu">'+esc(p.d)+' · '+fs.length+' foto'+(fs.length===1?'':'s')+'</span></div>'+g+
-  '<div class="kbot"><div>'+t+'</div><div class="kact"><div class="kq">¿'+esc(p.n)+' conforme?</div><div class="kbts">'+bt+'</div>'+
-  (c.sug&&!r?'<div class="mu sm">Sugerido por la IA: <b>'+R[c.sug]+'</b> (borde punteado)</div>':'')+
-  (r==='NO'?'<textarea id="kNota" rows="2" placeholder="¿Qué está mal? (opcional)">'+esc((k.notas||{})[p.k]||'')+'</textarea>':'')+
-  '<div class="knav"><button type="button" class="b s" id="kAnt"'+(P?'':' disabled')+'>← Anterior</button><button type="button" class="b s" id="kSig">Siguiente →</button><span class="mu sm">Teclas S / N / A</span></div></div></div>'}
+function b64aBlob(s){var bin=atob(s),u=new Uint8Array(bin.length);for(var i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return new Blob([u],{type:'image/jpeg'})}
+async function blobA64(b){var u=new Uint8Array(await b.arrayBuffer()),s='',i;for(i=0;i<u.length;i+=32768)s+=String.fromCharCode.apply(null,u.subarray(i,i+32768));return btoa(s)}
+function nombreFoto(i){return'foto_'+String(i+1).padStart(3,'0')+'.jpg'}
+function datosActa(d){var a=d.acta||{};return{nic:a.nic||'',fecha:a.fecha||'',tec:a.tecnico||'',medEnc:a.medEnc||'',medInst:a.medInst||'',cambioMed:a.cambioMed||'',bolsa:d.bolsa||'',
+ irr:(a.irr||[]).map(function(i){return i.n+' '+i.nombre})}}
+var PRE={},PREL=[],SUB={};
+function preparar(o){if(PRE[o])return PRE[o];
+ PRE[o]=(async function(){
+  var k=kk(o),fotos=[],fuente='';
+  if(window.vofPuente){try{var j=await window.vofPuente('fotos_bajar',{orden:o});
+   fotos=(j.fotos||[]).map(function(f){var b=b64aBlob(f.blob);return{b:b,u:URL.createObjectURL(b)}});if(fotos.length)fuente='drive'}catch(e){}}
+  if(!fotos.length||!k.acta){var u8=await pdfDe(o),d=await leerPdf(u8);
+   if(!k.acta){k.acta=datosActa(d);k.t=Date.now();guardarLocal();subir(o)}
+   if(!fotos.length){fotos=d.fotos;fuente='pdf';subirFotos(o,fotos)}else d.fotos.forEach(function(f){URL.revokeObjectURL(f.u)})}
+  return{fotos:fotos,fuente:fuente}})();
+ PRE[o].catch(function(){delete PRE[o]});
+ PREL.push(o);var v=0;while(PREL.length>6&&v++<12){var x=PREL.shift();if(CUR&&CUR.o===x){PREL.push(x);continue}var q=PRE[x];delete PRE[x];if(q)q.then(function(d){d.fotos.forEach(function(f){URL.revokeObjectURL(f.u)})},function(){})}
+ return PRE[o]}
+async function subirFotos(o,fotos){if(!window.vofPuente||SUB[o]||!fotos.length)return;SUB[o]=1;
+ try{for(var i=0;i<fotos.length;i+=5){var lote=[];for(var j=i;j<Math.min(i+5,fotos.length);j++)lote.push({nombre:nombreFoto(j),blob:await blobA64(fotos[j].b)});
+   await window.vofPuente('fotos_subir',{orden:o,fotos:lote})}
+  if(CUR&&CUR.o===o){CUR.fuente='drive';pintarCab()}}
+ catch(e){delete SUB[o]}}
+function precargar(){if(!CUR)return;var F=base().filter(function(y){return est(y.o)!=='FINALIZADA'}),i=F.findIndex(function(y){return y.o===CUR.o});
+ F.slice(i+1,i+3).forEach(function(y){preparar(y.o).catch(function(){})})}
 
 /* ---------- abrir orden ---------- */
 window.kAbrir=function(o){if(!arr)window.kMostrar();abrir(o)};
 async function abrir(o,u8){
- var x=ORD.filter(function(y){return y.o===o})[0]||{o:o,nic:'',tec:'',fecha:'',hora:'',irr:'',tipo:''};
- var k=K[o]||{};CUR={o:o,x:x,paso:PASOS.findIndex(function(p){return!(k.resp||{})[p.k]}),fotos:[],tipos:{},lec:{},cargando:'Abriendo el acta…'};if(CUR.paso<0)CUR.paso=PASOS.length;
- lista();pintar();
- try{var d;if(u8){CUR.cargando='Sacando las fotos del acta…';pintar();d=await leerPdf(u8);d.pdfUrl=URL.createObjectURL(new Blob([u8],{type:'application/pdf'}))}else{if(!PRE[o]){CUR.cargando='Abriendo el acta y sacando las fotos…';pintar()}d=await preparar(o)}
-  if(!CUR||CUR.o!==o)return;CUR.link=d.pdfUrl;
-  CUR.fotos=d.fotos;CUR.acta=d.acta;CUR.bolsa=d.bolsa;CUR.irrN=(d.acta.irr||[]).map(function(i){return i.n}).sort(function(a,b){return a-b});
-  CUR.anom=(d.acta.irr||[]).map(function(i){return i.n+' '+i.nombre}).join(' · ')||(x.irr&&x.irr!=='SIN ANOMALÍA'?x.irr:'');
-  if(!x.nic&&d.acta.nic)x.nic=d.acta.nic;if(!x.fecha&&d.acta.fecha)x.fecha=d.acta.fecha;if(!x.medEnc&&d.acta.medEnc)x.medEnc=d.acta.medEnc;if(!x.tec&&d.acta.tecnico)x.tec=d.acta.tecnico;
-  CUR.cargando='';aplicarIA();if(!(K[o]&&K[o].ia&&K[o].ia.n===CUR.fotos.length))clasificar();precargar()}
- catch(e){if(CUR&&CUR.o===o){CUR.cargando='';CUR.error=(e&&e.message)||X.drMsg(e)||'Error al leer el PDF.';pintar()}}}
-function responder(v){if(!CUR||CUR.paso>=PASOS.length)return;var o=CUR.o,p=PASOS[CUR.paso].k,k=K[o]||(K[o]={resp:{},notas:{}});k.resp=k.resp||{};
- k.resp[p]=v;k.t=Date.now();delete k.estado;guardarLocal();subir(o);if(v!=='NO')CUR.paso++;pintar();lista()}
-function aprobar(){var o=CUR.o,k=K[o];if(!k)return;var mal=PASOS.some(function(p){return k.resp[p.k]==='NO'});k.estado=mal?'NO CONFORME':'CONFORME';
- k.t=Date.now();k.por=new Date().toLocaleString('es-CO',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});guardarLocal();subir(o);toast('Orden '+o+': '+k.estado);
- var F=filtradas().filter(function(y){var e=est(y.o);return y.o!==o&&e!=='CONFORME'&&e!=='NO CONFORME'});if(F.length)abrir(F[0].o);else{CUR=null;pintar();lista()}}
+ var x=ORD.filter(function(y){return y.o===o})[0]||{o:o,nic:'',tec:'',fecha:'',hora:'',irr:'',mo:[]};
+ CUR={o:o,x:x,fotos:[],cargando:'Cargando las fotos…'};lista();pintar();
+ try{var d;
+  if(u8){var dd=await leerPdf(u8);var k=kk(o);if(!k.acta){k.acta=datosActa(dd);k.t=Date.now();guardarLocal();subir(o)}d={fotos:dd.fotos,fuente:'pdf'};if(/^\d{6,}$/.test(o))subirFotos(o,dd.fotos)}
+  else d=await preparar(o);
+  if(!CUR||CUR.o!==o)return;CUR.fotos=d.fotos;CUR.fuente=d.fuente;CUR.cargando='';
+  var a=(K[o]||{}).acta||{};if(!x.nic)x.nic=a.nic;if(!x.fecha)x.fecha=a.fecha;if(!x.tec)x.tec=a.tec;
+  pintar();precargar()}
+ catch(e){if(CUR&&CUR.o===o){CUR.cargando='';CUR.error=(e&&e.message)||X.drMsg(e)||'Error al leer el acta.';pintar()}}}
 
-/* ---------- visor grande ---------- */
-function lbAbrir(l,i){LB={l:l,i:i};$('kLb').hidden=false;lbPintar()}
-function lbPintar(){var y=LB.l[LB.i];if(!y)return;$('kLbI').src=y.f.u;$('kLbC').textContent='Foto '+(y.i+1)+' · '+(LB.i+1)+' de '+LB.l.length+' · página '+y.f.pag+' del acta'}
-function lbMover(d){LB.i=(LB.i+d+LB.l.length)%LB.l.length;lbPintar()}
-$('kLbX').onclick=function(){$('kLb').hidden=true};$('kLbP').onclick=function(){lbMover(-1)};$('kLbN').onclick=function(){lbMover(1)};
-$('kLb').onclick=function(e){if(e.target===this)this.hidden=true};
+/* ---------- pintar ---------- */
+function obligatorios(a){var r=['conos','fachada','papelografo','finales','constancia'];
+ if(a.cambioMed==='SI')r.push('medidor_encontrado','medidor_instalado');if(a.bolsa)r.push('bolsa');if((a.irr||[]).length)r.push('irregularidad');return r}
+function cabecera(){var x=CUR.x,k=K[CUR.o]||{},e=est(CUR.o);
+ return'<div class="kch" id="kCab"><b>Orden '+esc(x.o)+'</b><span class="mu">NIC '+esc(x.nic)+' · '+esc(x.tec)+' · '+esc(x.fecha)+' '+esc(x.hora)+'</span>'+
+  '<span class="ke big '+(e==='FINALIZADA'?'ok':e==='EN REVISIÓN'?'wn':'')+'">'+e+'</span>'+
+  (k.fin?'<span class="mu sm">Cerrada por '+esc(k.fin.por||'?')+' el '+esc(fechaCorta(k.fin.t))+'</span>':'')+
+  '<span style="flex:1"></span><span class="mu sm">'+(CUR.fuente==='drive'?'Fotos guardadas en Drive ✓':CUR.fuente==='pdf'?'Fotos sacadas del PDF (guardándolas en Drive…)':'')+'</span>'+
+  '<button type="button" class="kpdf" id="kVerPdf">PDF</button></div>'}
+function pintarCab(){var c=$('kCab');if(c&&CUR&&!CUR.cargando)c.outerHTML=cabecera()}
+function serialHtml(){var k=K[CUR.o]||{},a=k.acta||{},s=k.serial;
+ var t='<div class="kser"><div><span class="mu sm">Serial medidor instalado (acta)</span><b>'+esc(a.cambioMed==='SI'?(a.medInst||'—'):'No se cambió medidor')+'</b></div>';
+ if(s)t+='<div><span class="mu sm">Leído '+(s.via==='barras'?'del código de barras':'por la IA')+'</span><b>'+esc(s.leido||'—')+'</b></div><span class="ksr big '+(s.res==='CONFORME'?'ok':s.res==='NO CONFORME'?'er':'')+'">'+esc(SER[s.res]||s.res)+'</span>'+
+  (s.foto>=0?'<button type="button" class="b s" data-ir="'+s.foto+'">Ver foto '+(s.foto+1)+'</button>':'')+(s.aviso?'<span class="mu sm">'+esc(s.aviso)+'</span>':'');
+ t+='<button type="button" class="b s" id="kSer1">'+(s?'Volver a verificar':'Verificar serial')+'</button></div>';return t}
+function chip(i){var m=((K[CUR.o]||{}).fotos||{})[i];if(!m)return'<span class="kchip nada">Sin marcar</span>';
+ return'<span class="kchip '+(m.e==='NC'?'nc':m.e==='C'?'c':'')+'">'+esc(TN[m.tipo]||'Sin tipo')+(m.e?' · '+(m.e==='C'?'✓':'✗'):'')+'</span>'}
+function resumen(){var k=K[CUR.o]||{},f=k.fotos||{},a=k.acta||{},por={},nc=[],sin=0;
+ CUR.fotos.forEach(function(_,i){var m=f[i];if(!m||!m.tipo){sin++;return}var p=por[m.tipo]||(por[m.tipo]={c:0,nc:0,n:0});p.n++;if(m.e==='C')p.c++;else if(m.e==='NC'){p.nc++;nc.push(i)}});
+ var falta=obligatorios(a).filter(function(t){return!por[t]});
+ var h='<div class="kres"><h3>Resumen de la orden</h3><div class="kresg">'+TIPOS.map(function(t){var p=por[t[0]];
+  return'<div class="kri'+(p?'':' vacio')+(falta.indexOf(t[0])>=0?' falta':'')+'"><span>'+t[1]+'</span><b>'+(p?p.n:0)+'</b>'+(p?'<em>'+(p.c?p.c+' ✓ ':'')+(p.nc?'<i>'+p.nc+' ✗</i>':'')+'</em>':(falta.indexOf(t[0])>=0?'<em>falta</em>':''))+'</div>'}).join('')+'</div>';
+ if(falta.length)h+='<p class="kfalta">Faltan fotos de: <b>'+falta.map(function(t){return TN[t]}).join(', ')+'</b></p>';
+ if(sin)h+='<p class="mu">'+sin+' foto'+(sin>1?'s':'')+' sin marcar.</p>';
+ if(nc.length)h+='<div class="knc"><b>No conformes</b>'+nc.map(function(i){var m=f[i];return'<button type="button" class="knci" data-ir="'+i+'">Foto '+(i+1)+' · '+esc(TN[m.tipo]||'')+(m.obs?' — '+esc(m.obs):'')+'</button>'}).join('')+'</div>';
+ h+='<div class="kfin">'+(k.fin?'<button type="button" class="kbt no big" id="kReab">Reabrir orden</button><span class="mu sm">Resultado: <b>'+esc(k.fin.res||'')+'</b></span>':
+  '<button type="button" class="kbt si big" id="kFin">✓ Finalizar orden</button><span class="mu sm">'+(falta.length||sin?'Puedes finalizarla igual; quedará con lo que falta anotado.':'Todo marcado.')+'</span>')+'</div></div>';return h}
+function pintar(){
+ if(!CUR){$('kDet').innerHTML='<div class="kvac"><b>Escoge una orden de la lista</b><p class="mu">Salen todas las fotos del acta. Dale clic a una para verla grande y marcar qué es y si está conforme. Todo se guarda solo en la nube.</p></div>';return}
+ if(CUR.cargando){$('kDet').innerHTML='<div class="kvac"><span class="spin"></span> '+esc(CUR.cargando)+'</div>';return}
+ if(CUR.error){$('kDet').innerHTML='<div class="kvac"><b>No se pudo abrir el acta</b><p class="mu">'+esc(CUR.error)+'</p></div>';return}
+ var k=K[CUR.o]||{},a=k.acta||{};
+ $('kDet').innerHTML=cabecera()+
+  ((a.irr||[]).length?'<div class="mu sm">Anomalías del acta: <b>'+esc(a.irr.join(' · '))+'</b></div>':'<div class="mu sm">El acta no reporta anomalía.</div>')+
+  serialHtml()+
+  '<div class="kgal">'+CUR.fotos.map(function(f,i){var m=(k.fotos||{})[i];return'<button type="button" class="kth'+(m&&m.e==='NC'?' nc':m&&m.e==='C'?' c':'')+'" data-f="'+i+'"><img src="'+f.u+'" alt="Foto '+(i+1)+'" loading="lazy"><span class="kn">'+(i+1)+'</span>'+chip(i)+'</button>'}).join('')+'</div>'+
+  resumen()}
+
+/* ---------- visor grande con panel ---------- */
+function lbAbrir(i){LBI=i;$('kLb').hidden=false;lbPintar()}
+function lbPintar(){var f=CUR&&CUR.fotos[LBI];if(!f)return;var k=kk(CUR.o),m=k.fotos[LBI]||{};
+ $('kLbI').src=f.u;$('kLbC').textContent='Foto '+(LBI+1)+' de '+CUR.fotos.length+' · orden '+CUR.o;
+ $('kLbPan').innerHTML='<div class="kpt2">Foto '+(LBI+1)+'</div><div class="mu sm">¿Qué es?</div><div class="ktip">'+TIPOS.map(function(t){return'<button type="button" data-t="'+t[0]+'" class="'+(m.tipo===t[0]?'on':'')+'">'+t[1]+'</button>'}).join('')+'</div>'+
+  '<div class="mu sm">Estado</div><div class="kbts"><button type="button" class="kbt si'+(m.e==='C'?' on':'')+'" data-e="C">✓ Conforme</button><button type="button" class="kbt no'+(m.e==='NC'?' on':'')+'" data-e="NC">✗ No conforme</button></div>'+
+  '<textarea id="kObs" rows="3" placeholder="Observación (opcional)">'+esc(m.obs||'')+'</textarea>'+
+  '<div class="knav"><button type="button" class="b s" data-n="-1">← Anterior</button><button type="button" class="b s" data-n="1">Siguiente →</button></div>'+
+  '<button type="button" class="b s kbor" id="kBor">Borrar marca de esta foto</button>'+
+  '<div class="mu sm">Teclas: ← → pasar · C conforme · N no conforme · Esc cerrar</div>'+(k.fin?'<div class="kmsg">La orden está finalizada: si cambias algo, reábrela.</div>':'')}
+function marcar(cambio,avanzar){var k=kk(CUR.o),m=k.fotos[LBI]||(k.fotos[LBI]={});Object.assign(m,cambio);m.por=ana();m.t=Date.now();k.t=Date.now();guardarLocal();subir(CUR.o);
+ if(avanzar&&m.tipo&&LBI<CUR.fotos.length-1){LBI++}lbPintar();lista()}
+function lbCerrar(){$('kLb').hidden=true;pintar()}
+$('kLbX').onclick=lbCerrar;$('kLbP').onclick=function(){if(LBI>0){LBI--;lbPintar()}};$('kLbN').onclick=function(){if(LBI<CUR.fotos.length-1){LBI++;lbPintar()}};
+$('kLb').onclick=function(e){if(e.target===this)lbCerrar()};
+$('kLbPan').onclick=function(e){var t=e.target.closest('button');if(!t)return;
+ if(t.dataset.t)marcar({tipo:t.dataset.t},false);
+ else if(t.dataset.e){var k=kk(CUR.o),m=k.fotos[LBI]||{};marcar({e:m.e===t.dataset.e?'':t.dataset.e},m.e!==t.dataset.e&&t.dataset.e==='C');if(t.dataset.e==='NC'&&$('kObs'))$('kObs').focus()}
+ else if(t.dataset.n){var n=LBI+(+t.dataset.n);if(n>=0&&n<CUR.fotos.length){LBI=n;lbPintar()}}
+ else if(t.id==='kBor'){var k2=kk(CUR.o);delete k2.fotos[LBI];k2.t=Date.now();guardarLocal();subir(CUR.o);lbPintar();lista()}};
+$('kLbPan').oninput=function(e){if(e.target.id==='kObs'){var k=kk(CUR.o),m=k.fotos[LBI]||(k.fotos[LBI]={});m.obs=e.target.value;m.t=Date.now();k.t=Date.now();guardarLocal();subir(CUR.o)}};
+
+/* ---------- finalizar / reabrir ---------- */
+function finalizar(){var k=kk(CUR.o);if(!ana()){toast('Escribe tu nombre en "Analista" arriba para cerrar la orden.',true);$('kAna').focus();return}
+ var f=k.fotos||{},nc=Object.keys(f).filter(function(i){return f[i].e==='NC'}).length,falta=obligatorios(k.acta||{}).filter(function(t){return!Object.keys(f).some(function(i){return f[i].tipo===t})});
+ k.fin={t:Date.now(),por:ana(),res:nc||falta.length?'CON NOVEDAD ('+(nc?nc+' no conforme'+(nc>1?'s':''):'')+(nc&&falta.length?', ':'')+(falta.length?'faltan '+falta.map(function(t){return TN[t]}).join(', '):'')+')':'CONFORME'};
+ k.t=Date.now();guardarLocal();subir(CUR.o);toast('Orden '+CUR.o+' finalizada');
+ var F=base().filter(function(y){return y.o!==CUR.o&&est(y.o)!=='FINALIZADA'});if(F.length)abrir(F[0].o);else{pintar();lista()}}
+function reabrir(){var k=kk(CUR.o);delete k.fin;k.t=Date.now();guardarLocal();subir(CUR.o);pintar();lista()}
+
+/* ---------- seriales: código de barras (ZXing) y, si no se lee, IA ---------- */
+var ZX=null;
+function lectorZX(){if(ZX||typeof ZXing==='undefined')return ZX;var h=new Map();h.set(ZXing.DecodeHintType.TRY_HARDER,true);
+ h.set(ZXing.DecodeHintType.POSSIBLE_FORMATS,[ZXing.BarcodeFormat.CODE_128,ZXing.BarcodeFormat.CODE_39,ZXing.BarcodeFormat.ITF,ZXing.BarcodeFormat.EAN_13]);ZX=new ZXing.MultiFormatReader();ZX.setHints(h);return ZX}
+function trozo(im,x,y,w,h,e,rot){var c=document.createElement('canvas'),W=Math.round(w*e),H=Math.round(h*e);if(rot){c.width=H;c.height=W}else{c.width=W;c.height=H}var g=c.getContext('2d');if(rot){g.translate(H,0);g.rotate(Math.PI/2)}g.drawImage(im,x,y,w,h,0,0,W,H);return c}
+function decZX(c){var r=lectorZX();if(!r)return null;try{return r.decode(new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(new ZXing.HTMLCanvasElementLuminanceSource(c)))).getText()}catch(e){return null}}
+async function barras(f,afondo){var im=new Image();im.src=f.u;try{await im.decode()}catch(e){return[]}var W=im.width,H=im.height,out={};
+ for(var rot=0;rot<2;rot++){var v=decZX(trozo(im,0,0,W,H,1,rot));if(v)out[v]=1;
+  if(afondo){for(var n=2;n<=3;n++){var tw=W/n*1.5,th=H/n*1.5;for(var i=0;i<n;i++)for(var j=0;j<n;j++){var x=Math.max(0,Math.min(W-tw,i*W/n-tw*0.17)),y=Math.max(0,Math.min(H-th,j*H/n-th*0.17));
+   var v2=decZX(trozo(im,x,y,Math.min(tw,W),Math.min(th,H),n>2?2:1.5,rot));if(v2)out[v2]=1}}}
+  await new Promise(function(r){setTimeout(r,0)})}
+ return Object.keys(out)}
+function achicar(f,lado){return new Promise(function(ok){var im=new Image();im.onload=function(){var c=document.createElement('canvas');c.width=im.width;c.height=im.height;c.getContext('2d').drawImage(im,0,0);aBlob(c,lado,0.8).then(ok)};im.onerror=function(){ok(f.b)};im.src=f.u})}
+var PROMPT_SERIAL='Eres analista de calidad de una empresa de energía. Te paso fotos de UNA visita (foto 1 = la primera imagen adjunta). '+
+ 'Busca el medidor NUEVO que quedó INSTALADO (no el viejo que se retira) y lee su número de serie impreso en el frente o debajo del código de barras. '+
+ 'Responde SOLO un JSON: {"fotos":[],"lecturas":{"serial_instalado":"","foto":0}} con el serial tal como se lee y el número de la foto donde lo leíste. '+
+ 'Si no se ve con seguridad, deja serial_instalado vacío. No inventes ni completes dígitos.';
+async function verificarSerial(o){
+ var d=await preparar(o),k=kk(o),a=k.acta||{};
+ if(a.cambioMed!=='SI'){k.serial={res:'NO APLICA',acta:'',leido:'',foto:-1,via:'',t:Date.now()};k.t=Date.now();guardarLocal();subir(o);return k.serial}
+ var marc=Object.keys(k.fotos||{}).filter(function(i){return k.fotos[i].tipo==='medidor_instalado'}).map(Number);
+ var orden=marc.concat(d.fotos.map(function(_,i){return i}).filter(function(i){return marc.indexOf(i)<0}));
+ for(var x=0;x<orden.length;x++){var i=orden[x],cs=await barras(d.fotos[i],marc.indexOf(i)>=0);
+  for(var c=0;c<cs.length;c++)if(igual(a.medInst,cs[c])){k.serial={res:'CONFORME',acta:a.medInst,leido:cs[c],foto:i,via:'barras',t:Date.now()};k.t=Date.now();guardarLocal();subir(o);return k.serial}}
+ var S=X.sample&&X.sample(),res={res:'SIN LEER',acta:a.medInst,leido:'',foto:-1,via:'ia',t:Date.now()};
+ if(!S){res.aviso='El código de barras no se leyó y no hay claves de IA.'}
+ else{var sel=marc.length?marc:d.fotos.map(function(_,i){return i}).slice(0,40);
+  try{var imgs=await Promise.all(sel.map(function(i){return achicar(d.fotos[i],marc.length?1400:900)}));
+   var j=await S.json(PROMPT_SERIAL,{images:imgs}),l=(j&&j.lecturas)||{},sr=String(l.serial_instalado||'').trim();
+   if(sr){var ok=igual(a.medInst,sr);res.leido=sr;res.res=ok===false?'NO CONFORME':ok?'CONFORME':'SIN LEER';var fn=+l.foto;if(fn>=1&&fn<=sel.length)res.foto=sel[fn-1]}}
+  catch(e){res.aviso=(e&&e.message)||'La IA no respondió.';res.reintentar=1}}
+ if(!res.reintentar){k.serial=res;k.t=Date.now();guardarLocal();subir(o)}return res}
+async function verificarLote(){
+ if(VER){VER.parar=true;return}
+ var L=base().filter(function(x){var s=(K[x.o]||{}).serial;return!s}),n=0,c={CONFORME:0,'NO CONFORME':0,'SIN LEER':0,'NO APLICA':0};
+ if(!L.length){toast('Las órdenes filtradas ya tienen el serial verificado.');return}
+ VER={parar:false};$('kVer').textContent='Detener';
+ for(var i=0;i<L.length&&!VER.parar;i++){$('kVerI').textContent='Verificando '+(i+1)+' de '+L.length+' (orden '+L[i].o+')…';
+  try{var r=await verificarSerial(L[i].o);c[r.res]=(c[r.res]||0)+1;n++;if(r.reintentar&&/claves/i.test(r.aviso||'')){$('kVerI').textContent='Paré: '+r.aviso;break}}catch(e){}
+  lista();if(CUR&&CUR.o===L[i].o&&!LBabierto())pintar()}
+ $('kVerI').textContent=$('kVerI').textContent.indexOf('Paré')===0?$('kVerI').textContent:(n+' verificadas: '+c.CONFORME+' conformes, '+c['NO CONFORME']+' no conformes, '+c['SIN LEER']+' sin leer'+(c['NO APLICA']?', '+c['NO APLICA']+' sin cambio de medidor':'')+'.');
+ VER=null;$('kVer').textContent='Verificar seriales'}
 
 /* ---------- eventos ---------- */
 $('kLst').onclick=function(e){var b=e.target.closest('.kit');if(b)abrir(b.getAttribute('data-o'))};
-$('kDet').onclick=function(e){var t=e.target;
- var s=t.closest('.ks');if(s&&CUR){CUR.paso=+s.getAttribute('data-p');pintar();return}
- var r=t.closest('.kbt[data-r]');if(r){responder(r.getAttribute('data-r'));return}
- var f=t.closest('.kth');if(f){lbAbrir(fotosPaso(PASOS[CUR.paso].k),+f.getAttribute('data-f'));return}
- if(t.id==='kAnt'&&CUR.paso>0){CUR.paso--;pintar()}else if(t.id==='kSig'){CUR.paso=Math.min(PASOS.length,CUR.paso+1);pintar()}
- else if(t.id==='kApr')aprobar();
- else if(t.id==='kRe'&&CUR&&CUR.fotos.length){var k=K[CUR.o];if(k)delete k.ia;clasificar()}};
-$('kDet').oninput=function(e){if(e.target.id==='kNota'&&CUR){var k=K[CUR.o];k.notas=k.notas||{};k.notas[PASOS[CUR.paso].k]=e.target.value;k.t=Date.now();guardarLocal();subir(CUR.o)}};
-document.addEventListener('keydown',function(e){if(sec.hidden)return;if(!$('kLb').hidden){if(e.key==='Escape')$('kLb').hidden=true;else if(e.key==='ArrowRight')lbMover(1);else if(e.key==='ArrowLeft')lbMover(-1);return}
- if(!CUR||/INPUT|TEXTAREA|SELECT/.test((e.target||{}).tagName||''))return;var c=e.key.toLowerCase();
- if(c==='s')responder('SI');else if(c==='n')responder('NO');else if(c==='a')responder('NA');else if(e.key==='ArrowRight'){CUR.paso=Math.min(PASOS.length,CUR.paso+1);pintar()}else if(e.key==='ArrowLeft'&&CUR.paso>0){CUR.paso--;pintar()}else return;e.preventDefault()});
-function seg(id,key){$(id).onclick=function(e){var b=e.target.closest('button');if(!b)return;FILT[key]=b.getAttribute('data-v');[].forEach.call(this.children,function(x){x.classList.toggle('on',x===b)});lista()}}
-seg('kDia','dia');seg('kEst','est');
-$('kTec').onchange=function(){FILT.tec=this.value;lista()};
+$('kDet').onclick=async function(e){var t=e.target;
+ var f=t.closest('.kth');if(f){lbAbrir(+f.getAttribute('data-f'));return}
+ var ir=t.closest('[data-ir]');if(ir){lbAbrir(+ir.getAttribute('data-ir'));return}
+ if(t.id==='kFin')finalizar();else if(t.id==='kReab')reabrir();
+ else if(t.id==='kSer1'){var o=CUR.o;t.disabled=true;t.textContent='Verificando…';delete kk(o).serial;try{await verificarSerial(o)}catch(x){toast('No se pudo verificar: '+((x&&x.message)||''),true)}if(CUR&&CUR.o===o)pintar();lista()}
+ else if(t.id==='kVerPdf'){var w=window.open('','_blank');try{var u8=await pdfDe(CUR.o);var url=URL.createObjectURL(new Blob([u8],{type:'application/pdf'}));if(w)w.location=url;else location.href=url}catch(x){if(w)w.close();toast((x&&x.message)||'No se pudo abrir el PDF',true)}}};
+document.addEventListener('keydown',function(e){if(sec.hidden||!LBabierto())return;if(/INPUT|TEXTAREA|SELECT/.test((e.target||{}).tagName||'')){if(e.key==='Escape')e.target.blur();return}
+ if(e.key==='Escape')lbCerrar();else if(e.key==='ArrowRight'){if(LBI<CUR.fotos.length-1){LBI++;lbPintar()}}else if(e.key==='ArrowLeft'){if(LBI>0){LBI--;lbPintar()}}
+ else if(e.key.toLowerCase()==='c')marcar({e:'C'},true);else if(e.key.toLowerCase()==='n'){marcar({e:'NC'},false);if($('kObs'))$('kObs').focus()}else return;e.preventDefault()});
+function seg(id,key){$(id).onclick=function(e){var b=e.target.closest('button');if(!b)return;FILT[key]=b.getAttribute('data-v');if(id==='#kDia'||id==='kDia')[].forEach.call(this.children,function(x){x.classList.toggle('on',x===b)});lista()}}
+seg('kDia','dia');seg('kEst','est');seg('kSer','ser');
+$('kTec').onchange=function(){FILT.tec=this.value;lista()};$('kMo').onchange=function(){FILT.mo=this.value;lista()};
 var tq;$('kQ').oninput=function(){var v=this.value;clearTimeout(tq);tq=setTimeout(function(){FILT.q=v.trim();lista()},180)};
+$('kVer').onclick=verificarLote;
 $('kPdf').onclick=function(){$('kFi').click()};
-$('kFi').onchange=async function(){var f=this.files[0];this.value='';if(!f)return;var o=(f.name.match(/\d{6,}/)||[''])[0]||('archivo-'+Date.now());
- abrir(o,new Uint8Array(await f.arrayBuffer()))};
-window.kMostrar=function(){if(!arr){arr=true;bajarTodo();window.kDatos()}$('kDot').classList.toggle('vivo',!!(X.sample&&X.sample()));lista();pintar()};
+$('kFi').onchange=async function(){var f=this.files[0];this.value='';if(!f)return;var o=(f.name.match(/\d{6,}/)||[''])[0]||('archivo-'+Date.now());abrir(o,new Uint8Array(await f.arrayBuffer()))};
+window.kMostrar=function(){if(!arr){arr=true;bajarTodo();window.kDatos();setInterval(function(){if(!sec.hidden&&!LBabierto()&&!VER)bajarTodo()},120000)}lista();if(!CUR)pintar()};
 pintar();
 })();

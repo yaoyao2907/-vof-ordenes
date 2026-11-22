@@ -52,3 +52,16 @@ Cámbiala en las Propiedades del script. Los analistas tendrán que escribir la 
 ---
 Archivos: `index.html` (página), `config.js` (URL del puente), `gh.js` (conexión con el puente),
 `res.js`, `vid.js`, `chk.js`, `est.js` y sus `.css`, y `apps-script/Codigo.gs` (va en Google, no en GitHub).
+
+## Validar IA (versión nueva)
+- Al abrir una orden se sacan las fotos del PDF del acta y se guardan en Drive: `VOF CAMP/FOTOS/<orden>/`. La próxima vez se cargan de ahí.
+- Revisión foto por foto: tipo (Conos, Fachada, Papelógrafo…), Conforme / No conforme y observación. Teclas ← → C N Esc.
+- Todo se guarda al instante en el puente (`vchk/<orden>`), así que se ve igual desde cualquier PC.
+- Botón **Finalizar orden**: guarda fecha, hora y analista. Se puede reabrir.
+- **Verificar seriales**: primero intenta leer el código de barras con ZXing y, si no puede, usa la IA del puente (`gemini-flash-latest`). El resultado queda guardado para no volver a gastar cupo.
+- Proveedores de IA en "Claves de IA": Gemini, Groq, OpenRouter y Cloudflare, con 5 claves cada uno y cambio automático.
+
+## Actualizar
+1. Sube a GitHub: index.html, gh.js, gh.css, chk.js, chk.css, README.md. **No subas config.js**, porque ahí está tu URL.
+2. Pega `apps-script/Codigo.gs` en el Apps Script y guarda. Luego ve a Implementar → Gestionar implementaciones → lápiz → Versión: **Nueva versión** → Implementar. La URL no cambia.
+3. En la página, Ctrl+F5.
