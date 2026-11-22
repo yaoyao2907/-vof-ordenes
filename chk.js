@@ -176,7 +176,7 @@ async function corrSub(){if(SQon)return;SQon=true;
 /* ---------- precarga en fila: una orden a la vez, hasta 3 adelante ---------- */
 var GEN=0;
 async function filaPrecarga(gen){if(!CUR)return;
- var F=base().filter(function(y){return est(y.o)!=='FINALIZADA'}),i=F.findIndex(function(y){return y.o===CUR.o}),sig=F.slice(i+1,i+4);
+ var F=base().filter(function(y){return est(y.o)!=='FINALIZADA'}),i=F.findIndex(function(y){return y.o===CUR.o}),sig=F.slice(i+1);
  for(var n=0;n<sig.length;n++){var o=sig[n].o;if(gen!==GEN)return;
   if(MEM[o]&&MEM[o].listo)continue;
   var v=await idbGet(o);if(v&&v.fotos&&v.fotos.length&&v.acta&&(K[o]||{}).acta)continue;     /* ya está lista en el navegador */
