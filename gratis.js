@@ -7,7 +7,7 @@
 function lsG(k,d){try{var v=localStorage.getItem(k);return v==null?d:v}catch(e){return d}}
 function lsS(k,v){try{localStorage.setItem(k,v)}catch(e){}}
 var CFG_K='vof_gratis_cfg';
-var DEF={gemKey:'',gemModel:'gemini-flash-latest',gemLite:'gemini-flash-lite-latest',groqKey:'',groqModel:'qwen/qwen3.6-27b',orKey:'',orModel:'openrouter/free',gClient:''};
+var DEF={gemKey:'',gemModel:'gemini-3.6-flash',gemLite:'gemini-flash-lite-latest',groqKey:'',groqModel:'qwen/qwen3.6-27b',orKey:'',orModel:'openrouter/free',gClient:''};
 function cfg(){var c={};try{c=JSON.parse(lsG(CFG_K,'{}'))||{}}catch(e){c={}}Object.keys(DEF).forEach(function(k){if(c[k]==null||String(c[k]).trim()==='')c[k]=DEF[k];else c[k]=String(c[k]).trim()});return c}
 function cfgSave(c){lsS(CFG_K,JSON.stringify(c))}
 
@@ -38,8 +38,10 @@ async function pedir(url,init,prov){
  else{er.code='error';var m=/"message"\s*:\s*"([^"]{0,220})/.exec(txt);er.det='Error '+r.status+(m?': '+m[1]:'')}
  throw er}
 async function gemini(c,prompt,imgs,eco){
+ if(eco&&c.gemLite!==c.gemModel){try{return await gemini1(c,prompt,imgs,c.gemLite)}catch(e){if(e.code==='cupo'||e.code==='clave')throw e}}
+ return gemini1(c,prompt,imgs,c.gemModel)}
+async function gemini1(c,prompt,imgs,model){
  var parts=[{text:prompt}];for(var i=0;i<imgs.length;i++)parts.push({inline_data:{mime_type:'image/jpeg',data:imgs[i]}});
- var model=eco?c.gemLite:c.gemModel;
  var txt=await pedir('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(model)+':generateContent',
   {method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':c.gemKey},
    body:JSON.stringify({contents:[{role:'user',parts:parts}],generationConfig:{temperature:0.2,responseMimeType:'application/json'}})},'Gemini');
@@ -168,12 +170,11 @@ function montarUI(){
   '<div class="g2c"><div>'+campo('gGroK','Clave de Groq','gsk_…','password')+'</div><div>'+campo('gGroM','Modelo',DEF.groqModel)+'</div></div>'+
   '<h4>3. OpenRouter (último recurso)</h4><p class="mu" style="margin:0">Clave gratis en <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">openrouter.ai/keys</a></p>'+
   '<div class="g2c"><div>'+campo('gOrK','Clave de OpenRouter','sk-or-…','password')+'</div><div>'+campo('gOrM','Modelo',DEF.orModel)+'</div></div>'+
-  '<h4>Google Drive</h4><p class="mu" style="margin:0">ID de cliente OAuth (tipo "Aplicación web") de <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener">Google Cloud → Credenciales</a>. En "Orígenes autorizados de JavaScript" pon <b id="gOri"></b></p>'+
-  campo('gCli','ID de cliente de Google','123456-abc.apps.googleusercontent.com')+
+  '<h4>Google Drive</h4><p class="mu" style="margin:0">Se conecta con tu Apps Script. Para cambiar la URL o la clave dale a <button class="b s" id="gAps" type="button">Cambiar Apps Script</button></p>'+
   '<div class="tb" style="margin-top:14px"><button class="b" id="gGua" type="button">Guardar</button><button class="b s" id="gPro" type="button">Probar las IA</button><button class="b s" id="gCer" type="button">Cerrar</button></div>'+
   '<div id="gRes"></div></div>';
  document.body.appendChild(p);
- $('gOri').textContent=location.origin;
+ $('gAps').onclick=function(){p.hidden=true;GDR.conectar()};
  $('gDrv').onclick=function(){GDR.conectar()};
  $('gAbr').onclick=function(){abrirCfg()};
  $('gCer').onclick=function(){p.hidden=true};
@@ -184,8 +185,8 @@ function montarUI(){
   try{var r=await IAG.probar();$('gRes').innerHTML='<table>'+r.map(function(x){return'<tr><td><b>'+esc(x[0])+'</b></td><td>'+esc(x[1])+'</td><td>'+esc(x[2])+'</td></tr>'}).join('')+'</table>'}catch(e){}
   b.disabled=false;b.textContent='Probar las IA'};
  pintaBoton()}
-var MAP=[['gGemK','gemKey'],['gGemM','gemModel'],['gGemL','gemLite'],['gGroK','groqKey'],['gGroM','groqModel'],['gOrK','orKey'],['gOrM','orModel'],['gCli','gClient']];
-function guardar(){var c={};MAP.forEach(function(m){c[m[1]]=$(m[0]).value.trim()});cfgSave(c)}
+var MAP=[['gGemK','gemKey'],['gGemM','gemModel'],['gGemL','gemLite'],['gGroK','groqKey'],['gGroM','groqModel'],['gOrK','orKey'],['gOrM','orModel']];
+function guardar(){var c={};try{c=JSON.parse(lsG(CFG_K,'{}'))||{}}catch(e){c={}}MAP.forEach(function(m){c[m[1]]=$(m[0]).value.trim()});cfgSave(c)}
 function abrirCfg(msg){var c=cfg(),raw={};try{raw=JSON.parse(lsG(CFG_K,'{}'))||{}}catch(e){}
  MAP.forEach(function(m){$(m[0]).value=raw[m[1]]||(/Key|gClient/.test(m[1])?'':c[m[1]])});
  $('gMsg').hidden=!msg;$('gMsg').textContent=msg||'';

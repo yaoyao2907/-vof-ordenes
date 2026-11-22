@@ -19,6 +19,7 @@ $('tRes').innerHTML=
  '<button class="b s" id="rCol" type="button" aria-expanded="true">▲ Ocultar cuadros</button><button class="b s" id="rAct" type="button">Actualizar</button><button class="b s" id="rAbr" type="button">Abrir Excel del computador</button><input type="file" id="rFi" accept=".xlsx" hidden></div>'+
  '<div class="rf" id="rF" hidden>'+
   '<div class="rdia" id="rDia" role="group" aria-label="Día"><button type="button" data-d="" class="on">Todos</button><button type="button" data-d="hoy">Hoy</button><button type="button" data-d="ayer">Ayer</button></div>'+
+  '<label>Fecha <input type="date" id="rFec" aria-label="Escoger el día del resultado"></label>'+
   '<label>Criterio <select id="rSCri"></select></label><label>Técnico <select id="rSTec"></select></label><label>Alertas <select id="rSAle"></select></label>'+
   '<input type="search" id="rQ" placeholder="Buscar orden, NIC o técnico" aria-label="Buscar en el resultado">'+
   '<button class="b s" id="rLim" type="button" hidden>Quitar filtros</button></div>'+
@@ -85,13 +86,14 @@ var ALE=[['','Todas'],['_cualquiera','Cualquier alerta'],['COBRO MAL','Cobro mal
 function rK(k){return R_KS.filter(function(x){return x[0]===k})[0]}
 function diasRef(){var hoy=fKey(hoyTxt()),ks={};RS.A.forEach(function(r){if(r._fk)ks[r._fk]=1});var l=Object.keys(ks).sort();
  return{hoy:hoy,ayer:l.filter(function(k){return k<hoy}).pop()||''}}
-function rDiaFil(){var d=diasRef();return RS.A.filter(function(r){return rFil.dia==='hoy'?r._fk===d.hoy:rFil.dia==='ayer'?r._fk===d.ayer:true})}
+function rDiaFil(){var d=diasRef();return RS.A.filter(function(r){return rFil.dia==='hoy'?r._fk===d.hoy:rFil.dia==='ayer'?r._fk===d.ayer:rFil.dia.charAt(0)==='f'?r._fk===rFil.dia.slice(1):true})}
 /* filtros de la barra (aplican a todo el cuadro) */
 function rBase(){
  var d=diasRef(),q=($('rQ').value||'').trim().toLowerCase();
  return RS.A.filter(function(r){
   if(rFil.dia==='hoy'&&r._fk!==d.hoy)return false;
   if(rFil.dia==='ayer'&&r._fk!==d.ayer)return false;
+  if(rFil.dia.charAt(0)==='f'&&r._fk!==rFil.dia.slice(1))return false;
   if(rFil.cri&&(' '+r._crit+' ').indexOf(' '+rFil.cri+' ')<0)return false;
   if(rFil.tec&&rv(r,'Técnico')!==rFil.tec)return false;
   if(rFil.ale==='_cualquiera'&&!rEsAlerta(r))return false;
@@ -205,7 +207,7 @@ function rEstado(){
  if(!RS.archivo)return;
  $('rArch').textContent=RS.archivo;
  var f=RS.fecha?RS.fecha.toLocaleString('es-CO',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):'';
- $('rInfo').textContent=(f?'Guardado por el script: '+f.replace(/\.$/,'')+'. ':'')+(X.mcp()?'Se actualiza solo cada 2 minutos desde Drive.':'Cargado desde el computador.');
+ $('rInfo').textContent=(f?'Guardado por el script: '+f.replace(/\.$/,'')+'. ':'')+(RS.fijo?'Resultado fijo de ese día: dale a "Actualizar" para volver al más reciente.':X.mcp()?'Se actualiza solo cada 2 minutos desde Drive.':'Cargado desde el computador.');
  $('rDot').classList.toggle('vivo',!!X.mcp())}
 /* actas PDF de VOF CAMP/ORDENES: se listan una vez y se refrescan cuando cambia el resultado */
 async function rPdfs(){
@@ -215,7 +217,7 @@ async function rPdfs(){
   PDFS=m}catch(e){}
  pdfBusy=false;if(RS.A.length)rTabla()}
 async function rDrive(manual){
- if(!X.mcp()||rBusy)return;rBusy=true;$('rAct').disabled=true;
+ if(!X.mcp()||rBusy||(RS.fijo&&!manual))return;rBusy=true;$('rAct').disabled=true;
  try{
   var xl=(await drLista(DR.res)).filter(function(f){return /^resultado.*\.xlsx$/i.test(f.title||'')}).sort(function(a,b){return String(b.modifiedTime).localeCompare(String(a.modifiedTime))});
   if(!xl.length)throw new Error('vacio');
@@ -259,7 +261,24 @@ function rColapso(on){$('tRes').classList.toggle('rcol',on);$('rCol').textConten
 try{rColapso(localStorage.getItem('vof_ordenes_rcol')==='1')}catch(e){}
 $('rCol').onclick=function(){rColapso(!$('tRes').classList.contains('rcol'));rAlto()};
 /* ---------- eventos ---------- */
-$('rAct').onclick=function(){if(X.mcp())rDrive(true);else $('rFi').click()};
+$('rAct').onclick=function(){if(X.mcp()){var f=RS.fijo;RS.fijo=false;$('rFec').value='';if(f){rFil.dia='';RS.id=''}rDrive(true)}else $('rFi').click()};
+/* ---------- escoger un día: filtra el Excel abierto o busca en Drive un resultado con órdenes de ese día ---------- */
+function rFijar(d,f){RS.id=f.id;RS.mod=String(f.modifiedTime);RS.fijo=true;rPonDatos(d,f.title,new Date(f.modifiedTime))}
+$('rFec').onchange=async function(){
+ var v=this.value;rLimN=200;
+ if(!v){rFil.dia='';if(RS.fijo){RS.fijo=false;RS.id='';rDrive(true)}else rPintar();return}
+ var k=v.replace(/-/g,''),txt=v.slice(8)+'/'+v.slice(5,7)+'/'+v.slice(0,4);rFil.dia='f'+k;
+ if(RS.A.some(function(r){return r._fk===k})){rPintar();rEstado();return}
+ if(!X.mcp()){rPintar();toast('El Excel abierto no tiene órdenes del '+txt+'.',true);return}
+ var antes=$('rInfo').textContent;$('rInfo').textContent='Buscando en Drive el resultado del '+txt+'…';
+ try{
+  var l=(await drLista(DR.res)).filter(function(f){return /^resultado.*\.xlsx$/i.test(f.title||'')&&!/\.tmp\./i.test(f.title||'')}).sort(function(a,b){return String(b.modifiedTime).localeCompare(String(a.modifiedTime))});
+  var f=l.filter(function(f){return(f.title||'').indexOf(v)>=0})[0];
+  if(f){rFijar(rLeer(await drBytes(f.id,[80,75])),f);toast('Resultado del '+txt+' cargado');return}
+  for(var i=0;i<l.length&&i<15;i++){if(l[i].id===RS.id)continue;var d=rLeer(await drBytes(l[i].id,[80,75]));
+   if(d.A.some(function(r){return r._fk===k})){rFijar(d,l[i]);toast('Órdenes del '+txt+' cargadas de '+l[i].title);return}}
+  $('rInfo').textContent=antes;rPintar();toast('En Drive no hay ningún resultado con órdenes del '+txt+'.',true);
+ }catch(e){$('rInfo').textContent=antes;rPintar();toast('Drive: '+drMsg(e),true)}};
 $('rAbr').onclick=function(){$('rFi').click()};
 $('rFi').onchange=function(){if(this.files[0])rArchivo(this.files[0]);this.value=''};
 $('rK').onclick=function(e){var b=e.target.closest('[data-k]');if(!b)return;var k=b.getAttribute('data-k');rFil.k=rFil.k===k?'todas':k;rLimN=200;rPintar()};
@@ -267,11 +286,11 @@ $('rDon').onclick=function(e){var b=e.target.closest('[data-r]');if(!b)return;va
 $('rTec').onclick=function(e){var b=e.target.closest('[data-t]');if(!b)return;var t=b.getAttribute('data-t');rFil.tec=rFil.tec===t?'':t;rPintar()};
 $('rCri').onclick=function(e){var b=e.target.closest('[data-c]');if(!b)return;var c=b.getAttribute('data-c');rFil.cri=rFil.cri===c?'':c;rPintar()};
 $('rPro').onclick=function(e){var b=e.target.closest('[data-p]');if(!b)return;var p=b.getAttribute('data-p');rFil.pro=rFil.pro===p?'':p;rPintar()};
-$('rDia').onclick=function(e){var b=e.target.closest('[data-d]');if(!b)return;rFil.dia=b.getAttribute('data-d');rLimN=200;rPintar()};
+$('rDia').onclick=function(e){var b=e.target.closest('[data-d]');if(!b)return;rFil.dia=b.getAttribute('data-d');$('rFec').value='';rLimN=200;if(RS.fijo){RS.fijo=false;RS.id='';rDrive(true)}rPintar()};
 $('rSCri').onchange=function(){rFil.cri=this.value;rLimN=200;rPintar()};
 $('rSTec').onchange=function(){rFil.tec=this.value;rLimN=200;rPintar()};
 $('rSAle').onchange=function(){rFil.ale=this.value;rLimN=200;rPintar()};
-$('rLim').onclick=function(){rFil={k:'todas',tec:'',res:'',pro:'',dia:'',cri:'',ale:''};CF={};$('rQ').value='';rLimN=200;rPintar()};
+$('rLim').onclick=function(){rFil={k:'todas',tec:'',res:'',pro:'',dia:'',cri:'',ale:''};CF={};$('rQ').value='';$('rFec').value='';rLimN=200;rPintar()};
 $('rTf').addEventListener('change',function(e){var x=e.target.closest('select[data-f]');if(!x)return;var k=x.getAttribute('data-f');CF[k]=x.value?{t:'s',v:x.value}:null;x.classList.toggle('on',!!x.value);rLimN=200;rTabla();cfPintar()});
 var cfq;$('rTf').addEventListener('input',function(e){var x=e.target.closest('input[data-f]');if(!x)return;var k=x.getAttribute('data-f');CF[k]=x.value.trim()?{t:'t',v:x.value.trim()}:null;clearTimeout(cfq);cfq=setTimeout(function(){rLimN=200;rTabla()},200)});
 window.addEventListener('resize',function(){setTimeout(cfTop,150)});
