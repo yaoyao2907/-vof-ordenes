@@ -211,7 +211,7 @@ async function leerPdf(u8,op){op=op||{};
    var id=ops.argsArray[i][0];if(vis[id])continue;vis[id]=1;
    var img=await new Promise(function(ok){var src=String(id).indexOf('g_')===0?pg.commonObjs:pg.objs;try{src.get(id,ok)}catch(e){ok(null)}setTimeout(function(){ok(null)},8000)});
    if(!img)continue;var c=aCanvas(img);if(!c)continue;var mn=Math.min(c.width,c.height),ar=Math.max(c.width,c.height)/mn;
-   if(mn<300||ar>2.1)continue;                                        /* logos y firmas */
+   if(mn<40)continue;                                        /* logos y firmas */
    var h=huella(c);if(vis[h])continue;vis[h]=1;
    var b=await aBlob(c,1280,0.84);if(b){n++;if(op.onFoto)op.onFoto(b)}}
   pg.cleanup()}
