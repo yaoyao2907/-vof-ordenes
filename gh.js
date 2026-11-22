@@ -55,6 +55,7 @@ sample.json=async function(texto,opt){
  catch(e){ESTADO.iaErr=e.message||'falló';pinta();throw{code:'rate_limited',message:ESTADO.iaErr}}};
 
 window.vofPuente=function(a,d){return puente(a,d)};
+window.vofAviso=function(a,d){try{if(URL_P&&CLAVE)fetch(URL_P,{method:'POST',keepalive:true,headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(Object.assign({accion:a,clave:CLAVE},d||{}))})}catch(e){}};   /* al cerrar la pestaña */
 window.vofListo=function(){return LISTO.then(function(){return ESTADO.ok})};
 window.vofIA=function(){return hayIA()};
 window.claude={use:async function(n){await LISTO;if(!ESTADO.ok)return null;

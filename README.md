@@ -67,7 +67,13 @@ Archivos: `index.html` (página), `config.js` (URL del puente), `gh.js` (conexi�
 - **Finalizar orden**: guarda fecha, hora y analista. Se puede reabrir.
 - **Verificar seriales**: primero intenta con ZXing y después con la IA del puente.
 
+## Equipo, checklist y revisiones
+- ⚙ Configuración tiene 3 pestañas: **Estilos**, **Checklist** (agregar, quitar, renombrar y ordenar ítems) y **Analistas** (nombres y técnicos asignados). Todo se guarda en el puente para el equipo.
+- Al marcar ✓ ✗ N/A en el visor, la foto queda en ese ítem. Hay una sola casilla de **Observaciones de la orden**.
+- Bloqueo: la orden abierta queda a nombre del analista. Los demás la ven en solo lectura con 🔒. Se suelta al cambiar de orden, al finalizar o tras 10 minutos sin actividad. El admin la libera con su clave.
+- Pestaña **Revisiones**: tabla de lo revisado, con una columna por ítem del checklist, filtros y botón para exportar a Excel.
+
 ## Actualizar
-1. Sube a GitHub: index.html, gh.js, gh.css, chk.js, chk.css, README.md. **No subas config.js**, porque ahí está tu URL.
+1. Sube a GitHub los archivos que cambiaron (index.html, gh.js, gh.css, chk.js, chk.css, README.md). **No subas config.js**, porque ahí está tu URL.
 2. Pega `apps-script/Codigo.gs` en el Apps Script y guarda. Luego ve a Implementar → Gestionar implementaciones → lápiz → Versión: **Nueva versión** → Implementar. La URL no cambia.
 3. En la página, Ctrl+F5.

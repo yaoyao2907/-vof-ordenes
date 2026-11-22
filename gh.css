@@ -21,3 +21,4 @@
 #ghBar .ghok,#ghCfg .ghok{color:var(--ok,#2e8b57);font-weight:700}
 #ghBar .ghsal{margin-left:auto;border-color:var(--mu,#999);color:var(--mu,#777)}
 #ghCfg .ghadm{max-width:320px}#ghCfg .ghmsg{margin:0;font-weight:700}
+body{align-content:start}
