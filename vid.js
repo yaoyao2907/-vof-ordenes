@@ -115,7 +115,7 @@ async function drive(manual){
  busy=false;$('vAct').disabled=false}
 var arr=false;
 function iniciar(){if(arr)return;arr=true;nvCargar();
- if(!X.mcp()){arr=false;$('vInfo').textContent='Google Drive no está conectado: abre videos_consolidado.xlsx desde el computador.';return}
+ if(!X.mcp()){$('vInfo').textContent='Google Drive no está conectado: abre videos_consolidado.xlsx desde el computador.';return}
  drive(false);timer=setInterval(function(){if(!document.hidden)drive(false)},120000)}
 /* eventos */
 $('vPer').onclick=function(e){var b=e.target.closest('button');if(!b)return;F.p=b.getAttribute('data-p');[].forEach.call(this.children,function(x){x.classList.toggle('on',x===b)});
