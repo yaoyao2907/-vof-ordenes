@@ -149,7 +149,7 @@ function valor(r,c){
  if(c==='Fecha')return r._fk;
  if(c==='Orden'||c==='NIC'){var n=parseFloat(rv(r,c));return isNaN(n)?rv(r,c):n}
  return rv(r,c)}
-function cfVal(r,k){if(k==='_est')return[estDe(r)];if(k==='_alertas')return r._tags.map(function(t){return t[1]});if(k==='_crit')return r._crit.split(' ').filter(Boolean);return[rv(r,k)]}
+function cfVal(r,k){if(k==='_est')return[estDe(r)];if(k==='_pdf')return[PDFS[rv(r,'Orden')]?'CON PDF':'SIN PDF'];if(k==='_alertas')return r._tags.map(function(t){return t[1]});if(k==='_crit')return r._crit.split(' ').filter(Boolean);return[rv(r,k)]}
 function cfPasa(r,salta){for(var k in CF){var f=CF[k];if(!f||k===salta)continue;var vs=cfVal(r,k);
   if(f.t==='s'){if(f.v==='(vacío)'?vs.some(function(x){return x}):vs.indexOf(f.v)<0)return false}
   else{var q=f.v.toLowerCase();if(!vs.some(function(x){return x.toLowerCase().indexOf(q)>=0}))return false}}return true}
@@ -157,7 +157,6 @@ var CF_TXT={'Hora':1,'Orden':1,'NIC':1,'TIPO DE IRRE':1,'OBSERVACION IRREGULARID
 function cfPintar(){
  var BASE=rTabFiltro(rBase());
  $('rTf').innerHTML=COLS.map(function(c){var k=c[0];
-  if(k==='_pdf')return'<th class="pdf"></th>';
   var actual=CF[k];
   if(CF_TXT[k])return'<th><input type="search" data-f="'+esc(k)+'" placeholder="Filtrar" aria-label="Filtrar '+esc(c[4]||c[1])+'" value="'+esc(actual?actual.v:'')+'"></th>';
   var cnt={},vacio=0;BASE.filter(function(r){return cfPasa(r,k)}).forEach(function(r){var vs=cfVal(r,k);if(!vs.length||!vs.some(function(x){return x}))vacio++;vs.forEach(function(x){if(x)cnt[x]=(cnt[x]||0)+1})});
