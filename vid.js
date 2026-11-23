@@ -20,7 +20,7 @@ sec.innerHTML=
  '<div class="vhd"><span class="dot" id="vDot"></span><b>Videos de anomalías</b><span class="mu" id="vInfo">Buscando el consolidado en VOF CAMP/VIDEOS…</span><span style="flex:1"></span>'+
  '<button class="b s" id="vAct" type="button">Actualizar</button><button class="b s" id="vAbr" type="button">Abrir Excel del computador</button><input type="file" id="vFi" accept=".xlsx" hidden></div>'+
  '<div class="vf"><div class="vseg" id="vPer" role="group" aria-label="Periodo"><button type="button" data-p="gen" class="on">General</button><button type="button" data-p="hoy">Hoy</button><button type="button" data-p="ayer">Ayer</button><button type="button" data-p="dia">Día</button><button type="button" data-p="mes">Mes</button></div>'+
-  '<input type="date" id="vDia" aria-label="Día" hidden><select id="vMes" aria-label="Mes" hidden></select>'+
+  '<input type="date" id="vDia" aria-label="Día" hidden><select id="vMes" aria-label="Mes" hidden></select>'+'<span class="fdr"><label>Desde <input type="date" id="vDes"></label><label>Hasta <input type="date" id="vHas"></label></span>'+
   '<div class="vseg" id="vEst" role="group" aria-label="Estado"><button type="button" data-e="" class="on">Todas</button><button type="button" data-e="NO">Sin video</button><button type="button" data-e="SÍ">Con video</button><button type="button" data-e="SIN REVISAR">Sin revisar</button></div>'+
   '<label>Novedad <select id="vNov"><option value="">Todas</option><option value="NO TIENE">No tiene</option><option value="PENDIENTE">Pendiente</option><option value="SUBIDO">Subido</option><option value="-">Sin marcar</option></select></label><label>Técnico <select id="vTec"></select></label><input type="search" id="vQ" placeholder="Buscar orden, NIC, técnico o anomalía" aria-label="Buscar en videos">'+
   '<button class="b s" id="vLim" type="button" hidden>Quitar filtros</button></div>'+
@@ -62,7 +62,8 @@ function enPer(r){
  if(F.p==='ayer'){h.setDate(h.getDate()-1);return r._k===dk(h)}
  if(F.p==='dia')return !F.dia||r._k===F.dia.replace(/-/g,'');
  if(F.p==='mes')return !F.mes||r._k.slice(0,6)===F.mes;return true}
-function base(){var q=F.q.toLowerCase();return V.A.filter(function(r){return enPer(r)&&(!F.tec||rv(r,'Técnico')===F.tec)&&(!q||r._t.indexOf(q)>=0)})}
+function vRango(r){var de=($('vDes').value||'').replace(/-/g,''),ha=($('vHas').value||'').replace(/-/g,'');if(de&&(!r._k||r._k<de))return false;if(ha&&(!r._k||r._k>ha))return false;return true}
+function base(){var q=F.q.toLowerCase();return V.A.filter(function(r){return enPer(r)&&vRango(r)&&(!F.tec||rv(r,'Técnico')===F.tec)&&(!q||r._t.indexOf(q)>=0)})}
 function pl(e){return'<span class="vpl '+(e==='SÍ'?'ok':e==='NO'?'er':'wn')+'">'+(e==='SÍ'?'SÍ':e==='NO'?'NO':'SIN REVISAR')+'</span>'}
 function barras(el,m,max,fn){
  var ks=Object.keys(m).sort(function(a,b){return m[b].n-m[a].n||a.localeCompare(b)});if(fn)ks=fn(ks);
@@ -120,7 +121,7 @@ function iniciar(){if(arr)return;arr=true;nvCargar();
 /* eventos */
 $('vPer').onclick=function(e){var b=e.target.closest('button');if(!b)return;F.p=b.getAttribute('data-p');[].forEach.call(this.children,function(x){x.classList.toggle('on',x===b)});
  $('vDia').hidden=F.p!=='dia';$('vMes').hidden=F.p!=='mes';if(F.p==='dia'&&!F.dia){var h=new Date();F.dia=h.getFullYear()+'-'+('0'+(h.getMonth()+1)).slice(-2)+'-'+('0'+h.getDate()).slice(-2);$('vDia').value=F.dia}lim=300;pintar()};
-$('vDia').onchange=function(){F.dia=this.value;pintar()};$('vMes').onchange=function(){F.mes=this.value;pintar()};
+$('vDia').onchange=function(){F.dia=this.value;pintar()};$('vDes').onchange=$('vHas').onchange=function(){pintar()};$('vMes').onchange=function(){F.mes=this.value;pintar()};
 function ponEst(v){F.e=v;[].forEach.call($('vEst').children,function(x){x.classList.toggle('on',x.getAttribute('data-e')===v)});lim=300;pintar()}
 $('vEst').onclick=function(e){var b=e.target.closest('button');if(b)ponEst(b.getAttribute('data-e'))};
 $('vK').onclick=function(e){var b=e.target.closest('button[data-e]');if(b)ponEst(F.e===b.getAttribute('data-e')?'':b.getAttribute('data-e'))};
