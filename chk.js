@@ -36,8 +36,9 @@ sec.innerHTML=
  '<button class="b s" id="kVer" type="button">Verificar seriales</button><span class="mu sm" id="kVerI"></span></div>'+
  '<div class="kbox"><aside class="klst" id="kLst"></aside><div class="kdet" id="kDet"></div></div>'+
  '<div class="klb" id="kLb" hidden><div class="klbw" id="kLbW">'+
-  '<aside class="klba" id="kLbA"><div class="klbah"><b>Acta</b><span class="mu sm">rueda = zoom</span><span style="flex:1"></span><button type="button" id="kAZ" title="Ajustar al ancho">Ancho</button><button type="button" id="kAC" title="Ver el acta completa">Completa</button><button type="button" id="kAO" title="Ocultar el acta">Ocultar ◂</button></div>'+
-  '<div class="kst ka" id="kASt"><div class="kzw" id="kAZW"><img id="kAI" alt="Acta recortada" draggable="false"></div><div class="kamsg" id="kAMsg"></div></div></aside>'+
+  '<aside class="klba" id="kLbA"><div class="klbah"><b>Acta</b><span class="mu sm">rueda = zoom</span><span style="flex:1"></span><button type="button" id="kAZ" title="Ajustar al ancho">Ancho</button><button type="button" id="kAC" title="Ver el acta completa">Completa</button><button type="button" id="kAObsB" title="Leer el comentario completo">Comentario</button><button type="button" id="kAO" title="Ocultar el acta">Ocultar ◂</button></div>'+
+  '<div class="kst ka" id="kASt"><div class="kzw" id="kAZW"><img id="kAI" alt="Acta recortada" draggable="false"></div><div class="kamsg" id="kAMsg"></div></div>'+
+  '</aside>'+'<div class="kobov" id="kAObs" hidden title="Toca el fondo para volver al acta"><div class="kobbox" id="kAObsT"></div></div>'+
   '<div class="klbf"><div class="kzb"><button type="button" id="kAM" hidden>▸ Acta</button>'+
    '<button type="button" data-z="-" title="Alejar">−</button><button type="button" data-z="+" title="Acercar">+</button><button type="button" data-z="0" title="Ver la foto completa">Ajustar</button>'+
    '<button type="button" data-r="-90" title="Girar a la izquierda">⟲</button><button type="button" data-r="90" title="Girar a la derecha">⟳</button>'+
@@ -45,7 +46,7 @@ sec.innerHTML=
    '<div class="kst" id="kSt"><div class="kzw" id="kZW"><img id="kLbI" alt="Foto del acta" draggable="false"></div><div class="kesp" id="kEsp"></div>'+
    '<button type="button" class="kav p" id="kLbP" aria-label="Foto anterior">‹</button><button type="button" class="kav n" id="kLbN" aria-label="Foto siguiente">›</button></div></div>'+
   '<div class="klbp" id="kLbPan"></div></div></div>'+
- '<div class="kpdfov" id="kPdfOv" hidden><div class="kpdfh"><b id="kPdfT">PDF</b><span class="mu sm" id="kPdfM"></span><span style="flex:1"></span><a class="b s" id="kPdfD" download>Descargar</a><button type="button" class="b s" id="kPdfX">✕ Cerrar</button></div><iframe id="kPdfF" title="PDF del acta"></iframe></div>';
+  '<div class="kpdfov" id="kPdfOv" hidden><div class="kpdfh"><b id="kPdfT">PDF</b><span class="mu sm" id="kPdfM"></span><span style="flex:1"></span><a class="b s" id="kPdfD" download>Descargar</a><button type="button" class="b s" id="kPdfX">✕ Cerrar</button></div><iframe id="kPdfF" title="PDF del acta"></iframe></div>';
 
 var ORD=[],K={},CUR=null,FILT={dia:'',est:'',tec:'',mo:'',q:'',ser:'',asig:'mios'},LOCKS={},ANAS=[],DRV=null,arr=false,LBI=-1,VER=null;
 try{K=JSON.parse(localStorage.getItem('vof_chk2')||'{}')||{}}catch(e){K={}}
@@ -172,7 +173,7 @@ async function cargarOrden(E){var o=E.o,k=kk(o);
  if(!E.u8){
   /* 1. este navegador */
   var v=await idbGet(o);
-  if(v&&v.fotos&&v.fotos.length){E.fotos=v.fotos.map(urlDe);if(v.acta)E.acta=urlDe(v.acta);E.fuente='navegador';
+  if(v&&v.fotos&&v.fotos.length){E.fotos=v.fotos.map(urlDe);if(v.acta&&v.av===AV)E.acta=urlDe(v.acta);E.fuente='navegador';
    if(v.drive)SUBE[o]=SUBE[o]||{ok:1};else encolarSubida(o);avisar(E)}
   /* 2. Drive (VOF CAMP/FOTOS/<orden>) */
   else if(window.vofPuente&&/^\d{6,12}$/.test(o)){E.estado='Buscando las fotos en Drive…';avisar(E);var j=null;
@@ -180,16 +181,18 @@ async function cargarOrden(E){var o=E.o,k=kk(o);
    if(j&&j.fotos&&j.fotos.length){E.fuente='drive';var L=j.fotos,i;
     for(i=0;i<L.length;i+=3){var r=await window.vofPuente('foto_bajar',{ids:L.slice(i,i+3).map(function(x){return x.id})});
      (r.fotos||[]).forEach(function(f){E.fotos.push(urlDe(b64aBlob(f.blob)))});E.estado='Bajando fotos de Drive: '+E.fotos.length+' de '+L.length+'…';avisar(E)}
-    if(j.acta){try{var ra=await window.vofPuente('foto_bajar',{ids:[j.acta]});E.acta=urlDe(b64aBlob(ra.fotos[0].blob));avisar(E)}catch(e){}}
-    SUBE[o]={ok:1};await idbPut(o,{fotos:E.fotos.map(function(f){return f.b}),acta:E.acta?E.acta.b:null,drive:!!E.acta})}}}
+    if(j.acta&&j.actaNom===ACTA_NOM){try{var ra=await window.vofPuente('foto_bajar',{ids:[j.acta]});E.acta=urlDe(b64aBlob(ra.fotos[0].blob));avisar(E)}catch(e){}}
+    SUBE[o]={ok:1};await idbPut(o,{fotos:E.fotos.map(function(f){return f.b}),acta:E.acta?E.acta.b:null,av:AV,drive:!!E.acta})}}}
  /* 3. el PDF del acta: fotos (si no estaban), acta recortada y datos */
- if(!E.fotos.length||!E.acta||!k.acta){
+ if(!E.fotos.length||!E.acta||!k.acta||(k.acta.av!==AV)){
   var sacar=!E.fotos.length;E.estado=sacar?'Abriendo el PDF del acta…':'Recortando el acta…';avisar(E);
   var u8=E.u8||await pdfDe(o);
-  var d=await leerPdf(u8,{fotos:sacar,recorte:!E.acta,onFoto:function(b){E.fotos.push(urlDe(b));E.fuente='pdf';E.estado='Sacando las fotos del PDF ('+E.fotos.length+')…';avisar(E)}});
-  if(!k.acta){k.acta=datosActa(d);k.t=Date.now();guardarLocal();subir(o)}
-  if(d.recorte&&!E.acta){E.acta=urlDe(d.recorte);avisar(E)}
-  if(E.fotos.length&&/^\d{6,12}$/.test(o)){await idbPut(o,{fotos:E.fotos.map(function(f){return f.b}),acta:E.acta?E.acta.b:null,drive:false});encolarSubida(o)}}}
+  var x0=ORDM[o]||{},d=await leerPdf(u8,{fotos:sacar,recorte:!E.acta||(k.acta||{}).av!==AV,mo:x0.mo||[],onFoto:function(b){E.fotos.push(urlDe(b));E.fuente='pdf';E.estado='Sacando las fotos del PDF ('+E.fotos.length+')…';avisar(E)}});
+  if(!k.acta){k.acta=datosActa(d);k.t=Date.now()}
+  if(d.recorte){if(E.acta)URL.revokeObjectURL(E.acta.u);E.acta=urlDe(d.recorte.b);k.acta.av=AV;k.acta.obsTxt=d.recorte.obsTxt||'';k.acta.obsBox=d.recorte.obsBox||null;k.acta.rev=d.recorte.rev;k.t=Date.now()}
+  guardarLocal();subir(o);avisar(E);
+  if(E.fotos.length&&/^\d{6,12}$/.test(o)){await idbPut(o,{fotos:E.fotos.map(function(f){return f.b}),acta:E.acta?E.acta.b:null,av:AV,drive:false});encolarSubida(o)}}}
+var AV=2,ACTA_NOM='acta2.jpg';     /* versión del acta recortada: pruebas solo si hay revisión, comentario con contorno */
 
 /* ---------- subida a Drive: en fila, una foto por llamada ---------- */
 var SQ=[],SQon=false,SUBE={};
@@ -201,7 +204,7 @@ async function corrSub(){if(SQon)return;SQon=true;
   try{var v=await idbGet(o);if(!v||!v.fotos||!v.fotos.length){delete SUBE[o];continue}
    var j=await conReintento(function(){return window.vofPuente('fotos_listar',{orden:o})}),hay={};(j.fotos||[]).forEach(function(x){hay[x.nombre]=1});
    var T=v.fotos.map(function(b,i){return{nombre:nombreFoto(i),b:b}}).filter(function(x){return!hay[x.nombre]});
-   if(v.acta&&!j.acta)T.push({nombre:'acta.jpg',b:v.acta});
+   if(v.acta&&v.av===AV&&j.actaNom!==ACTA_NOM)T.push({nombre:ACTA_NOM,b:v.acta});
    for(var i=0;i<T.length;i++){st.txt='Guardando en Drive: '+(i+1)+' de '+T.length+'…';refrescaSub(o);
     var b64=await blobA64(T[i].b),nom=T[i].nombre;
     await conReintento(function(){return window.vofPuente('fotos_subir',{orden:o,fotos:[{nombre:nom,blob:b64}]})})}
@@ -242,7 +245,7 @@ async function leerPdf(u8,op){op=op||{};
  var pdf=await pdfjsLib.getDocument({data:new Uint8Array(u8),verbosity:0}).promise,vis={},O=pdfjsLib.OPS,n=0;
  var acta=null,lin=[];try{lin=await X.pdfLines(pdf);acta=X.parseActa(lin,'acta.pdf')}catch(e){acta=null}
  var bolsa='';try{lin.forEach(function(p){p.forEach(function(l,i){if(/MATERIAL SERIADO INSTALADO/i.test(l.cells.join(' '))){var nx=(p[i+1]||{cells:[]}).cells.join(' ');var m=/\b([A-Z]{2,4}\d{5,})\b/.exec(nx);if(m)bolsa=m[1]}})})}catch(e){}
- var recorte=null;if(op.recorte){try{recorte=await recortarActa(pdf)}catch(e){recorte=null}}
+ var recorte=null;if(op.recorte){try{recorte=await recortarActa(pdf,op.mo||[])}catch(e){recorte=null}}
  if(op.fotos)for(var p=1;p<=pdf.numPages;p++){var pg=await pdf.getPage(p),ops=await pg.getOperatorList();
   for(var i=0;i<ops.fnArray.length;i++){var f=ops.fnArray[i];if(f!==O.paintImageXObject&&f!==O.paintJpegXObject)continue;
    var id=ops.argsArray[i][0];if(vis[id])continue;vis[id]=1;
@@ -258,34 +261,52 @@ async function leerPdf(u8,op){op=op||{};
    medidor instalado, trabajos, materiales, observaciones), sin logo, sin textos legales y sin las fotos. */
 var CORTA_TXT=/^\s*(A LOS \d|NOTA\s*:|EL CLIENTE\/USUARIO SOLICITA|EN CASO DE)/;
 var SIGUE_TXT=/(DATOS DEL MEDIDOR|SELLOS|PRUEBAS REALIZADAS|PRUEBAS DE FUNCIONAMIENTO|CENSO DE CARGA|IRREGULARIDAD|TRABAJOS EJECUTADOS|MATERIAL |CONTROL OPERACIONAL|OBSERVACIONES)/;
-async function recortarActa(pdf){
- var ESC=2.2,trozos=[],fin=false,ini=false;
+var PRUEBAS_TXT=/PRUEBAS REALIZADAS|PRUEBAS DE FUNCIONAMIENTO/;
+async function recortarActa(pdf,mo){
+ var ESC=2.2,PG=[],fin=false;
+ /* 1) leer las líneas de texto de cada página */
  for(var p=1;p<=Math.min(pdf.numPages,4)&&!fin;p++){
   var pg=await pdf.getPage(p),vp1=pg.getViewport({scale:1}),tc=await pg.getTextContent(),L=[];
   tc.items.forEach(function(it){if(!it.str||!it.str.trim())return;var h=Math.abs(it.transform[3])||it.height||8,y=vp1.height-it.transform[5]-h;
    var l=null;for(var q=0;q<L.length;q++)if(Math.abs(L[q].y-y)<2.5){l=L[q];break}
-   if(!l){l={y:y,b:y+h,t:''};L.push(l)}l.t+=' '+it.str;l.b=Math.max(l.b,y+h);l.y=Math.min(l.y,y)});
-  L.sort(function(a,b){return a.y-b.y});
-  var bandas=[],cur=null,dentro=ini;
-  for(var i=0;i<L.length;i++){var T=X.nrm?X.nrm(L[i].t).toUpperCase():L[i].t.toUpperCase();
-   if(/SOPORTE FOTOGRAFICO|^\s*FIRMAS\b|REGISTRO FOTOGRAFICO/.test(T)){fin=true;break}
+   if(!l){l={y:y,b:y+h,t:'',x:it.transform[4]};L.push(l)}else if(it.transform[4]<l.x){l.t=' '+it.str+l.t;l.x=it.transform[4];l.b=Math.max(l.b,y+h);return}
+   l.t+=' '+it.str;l.b=Math.max(l.b,y+h);l.y=Math.min(l.y,y)});
+  L.sort(function(a,b){return a.y-b.y});L.forEach(function(l){l.T=(X.nrm?X.nrm(l.t):l.t).toUpperCase();if(/SOPORTE FOTOGRAFICO|^\s*FIRMAS\b|REGISTRO FOTOGRAFICO/.test(l.T))fin=true});
+  PG.push({pg:pg,L:L})}
+ /* 2) ¿la orden trae una mano de obra de revisión? (solo así se muestran las pruebas) */
+ var rev=(mo||[]).some(function(m){return /REVIS/i.test(m)}),enTr=false;
+ PG.forEach(function(P){P.L.forEach(function(l){if(/TRABAJOS EJECUTADOS/.test(l.T))enTr=true;else if(/MATERIAL INSTALADO|CONTROL OPERACIONAL/.test(l.T))enTr=false;else if(enTr&&/REVIS/.test(l.T))rev=true})});
+ /* 3) escoger las franjas a mostrar */
+ var trozos=[],ini=false,dentro=false,ctrl=false,obs=null,obsT=[];
+ for(var n=0;n<PG.length;n++){var P=PG[n],bandas=[],cur=null,acabo=false;dentro=ini;
+  for(var i=0;i<P.L.length;i++){var l=P.L[i],T=l.T;
+   if(/SOPORTE FOTOGRAFICO|^\s*FIRMAS\b|REGISTRO FOTOGRAFICO/.test(T)){acabo=true;break}
    if(/P.{1,3}GINA \d+ DE \d+/.test(T)){cur=null;continue}
    if(!ini){if(/CIUDAD/.test(T)){ini=dentro=true}else continue}
-   if(CORTA_TXT.test(T))dentro=false;else if(!dentro&&T.length<90&&SIGUE_TXT.test(T))dentro=true;
-   if(!dentro){cur=null;continue}
-   if(cur)cur.b=L[i].b;else{cur={y:L[i].y,b:L[i].b};bandas.push(cur)}}
-  if(!bandas.length){pg.cleanup();continue}
-  var vp=pg.getViewport({scale:ESC}),cv=document.createElement('canvas');cv.width=Math.ceil(vp.width);cv.height=Math.ceil(vp.height);
-  var g=cv.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,cv.width,cv.height);
-  await pg.render({canvasContext:g,viewport:vp}).promise;
-  bandas.forEach(function(b){var y0=Math.max(0,(b.y-4)*ESC),y1=Math.min(cv.height,(b.b+4)*ESC);if(y1-y0>6)trozos.push({c:cv,y:y0,h:y1-y0})});
-  pg.cleanup()}
+   if(!rev&&PRUEBAS_TXT.test(T))dentro=false;
+   else if(CORTA_TXT.test(T))dentro=false;
+   else if(!dentro&&T.length<90&&SIGUE_TXT.test(T))dentro=true;
+   if(!dentro){cur=null;if(obs&&obs.p===n&&!obs.cerr)obs.cerr=1;continue}
+   if(/CONTROL OPERACIONAL/.test(T))ctrl=true;
+   else if(ctrl&&!obs&&/^\s*OBSERVACIONES\s*$/.test(T))obs={p:n,y:l.y,b:l.b};
+   else if(obs&&obs.p===n&&!obs.cerr){obs.b=l.b;obsT.push(l.t.trim())}
+   if(cur)cur.b=l.b;else{cur={y:l.y,b:l.b};bandas.push(cur)}}
+  if(bandas.length){var vp=P.pg.getViewport({scale:ESC}),cv=document.createElement('canvas');cv.width=Math.ceil(vp.width);cv.height=Math.ceil(vp.height);
+   var g=cv.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,cv.width,cv.height);await P.pg.render({canvasContext:g,viewport:vp}).promise;
+   bandas.forEach(function(b){var y0=Math.max(0,(b.y-4)*ESC),y1=Math.min(cv.height,(b.b+4)*ESC);if(y1-y0>6)trozos.push({c:cv,p:n,y:y0,h:y1-y0})})}
+  P.pg.cleanup();if(acabo)break}
  if(!trozos.length){var pg1=await pdf.getPage(1),v1=pg1.getViewport({scale:ESC}),c1=document.createElement('canvas');c1.width=Math.ceil(v1.width);c1.height=Math.ceil(v1.height);
-  var g1=c1.getContext('2d');g1.fillStyle='#fff';g1.fillRect(0,0,c1.width,c1.height);await pg1.render({canvasContext:g1,viewport:v1}).promise;trozos.push({c:c1,y:0,h:c1.height})}
+  var g1=c1.getContext('2d');g1.fillStyle='#fff';g1.fillRect(0,0,c1.width,c1.height);await pg1.render({canvasContext:g1,viewport:v1}).promise;trozos.push({c:c1,p:0,y:0,h:c1.height})}
+ /* 4) unir las franjas en una sola imagen y marcar el comentario con un contorno */
  var mx=Math.round(22*ESC),W=trozos[0].c.width-2*mx,H=0;trozos.forEach(function(t){H+=t.h});
- var out=document.createElement('canvas');out.width=W;out.height=Math.ceil(H);var go=out.getContext('2d'),y=0;go.fillStyle='#fff';go.fillRect(0,0,W,out.height);
- trozos.forEach(function(t){go.drawImage(t.c,mx,t.y,W,t.h,0,y,W,t.h);y+=t.h});
- return new Promise(function(r){out.toBlob(r,'image/jpeg',0.85)})}
+ var out=document.createElement('canvas');out.width=W;out.height=Math.ceil(H);var go=out.getContext('2d'),yy=0,box=null;go.fillStyle='#fff';go.fillRect(0,0,W,out.height);
+ trozos.forEach(function(t){go.drawImage(t.c,mx,t.y,W,t.h,0,yy,W,t.h);
+  if(obs&&t.p===obs.p){var a=obs.y*ESC-6,b=obs.b*ESC+8;if(a>=t.y-2&&a<=t.y+t.h){var o0=yy+(a-t.y),o1=yy+(Math.min(b,t.y+t.h)-t.y);box=[Math.max(0,o0),o1]}}
+  yy+=t.h});
+ if(box){go.strokeStyle='#2457d6';go.lineWidth=5;var r=10,x0=4,y0=box[0],w=W-8,h=box[1]-box[0];
+  go.beginPath();go.moveTo(x0+r,y0);go.arcTo(x0+w,y0,x0+w,y0+h,r);go.arcTo(x0+w,y0+h,x0,y0+h,r);go.arcTo(x0,y0+h,x0,y0,r);go.arcTo(x0,y0,x0+w,y0,r);go.closePath();go.stroke()}
+ var bl=await new Promise(function(res){out.toBlob(res,'image/jpeg',0.85)});
+ return{b:bl,obsTxt:obsT.join(' ').replace(/\s+/g,' ').trim(),obsBox:box?[box[0]/out.height,box[1]/out.height]:null,rev:rev}}
 function b64aBlob(s){var bin=atob(s),u=new Uint8Array(bin.length);for(var i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return new Blob([u],{type:'image/jpeg'})}
 async function blobA64(b){var u=new Uint8Array(await b.arrayBuffer()),s='',i;for(i=0;i<u.length;i+=32768)s+=String.fromCharCode.apply(null,u.subarray(i,i+32768));return btoa(s)}
 function nombreFoto(i){return'foto_'+String(i+1).padStart(3,'0')+'.jpg'}
@@ -410,7 +431,7 @@ function pintarMini(){}
 /* ================= VISOR GRANDE: acta · foto (zoom/giro) · ítems ================= */
 var ACTA_OCULTA=false;try{ACTA_OCULTA=localStorage.getItem('vof_acta_oculta')==='1'}catch(e){}
 function LBabierto(){return!$('kLb').hidden}
-function lbAbrir(i){LBI=i;$('kLb').hidden=false;document.body.style.overflow='hidden';ZA.z.listo=false;lbActa();lbFoto();lbPanel();setTimeout(function(){ZA.ajustar();ZF.ajustar()},40)}
+function lbAbrir(i){LBI=i;$('kAObs').hidden=true;$('kLb').hidden=false;document.body.style.overflow='hidden';ZA.z.listo=false;lbActa();lbFoto();lbPanel();setTimeout(function(){ZA.ajustar();ZF.ajustar()},40)}
 function lbCerrar(sinPintar){$('kLb').hidden=true;document.body.style.overflow='';if(!sinPintar)pintar()}
 function lbRefrescar(){var E=E_();if(LBI>=E.fotos.length)LBI=Math.max(0,E.fotos.length-1);lbActa();if(!$('kLbI').getAttribute('src'))lbFoto();lbCap()}
 function lbCap(){var E=E_();$('kLbC').textContent='Foto '+(LBI+1)+' de '+E.fotos.length+(E.listo?'':'…')+' · orden '+CUR.o}
@@ -443,6 +464,9 @@ function Zoomer(st,zw,im,op){var z={s:1,tx:0,ty:0,bw:0,bh:0,min:1,ini:1,cont:1,l
   z.tx=mx-(mx-z.tx)*(ns/z.s);z.ty=my-(my-z.ty)*(ns/z.s);z.s=ns;poner()}
  function centro(f){en(f,st.clientWidth/2,st.clientHeight/2)}
  st.addEventListener('wheel',function(e){e.preventDefault();var r=st.getBoundingClientRect();en(e.deltaY<0?1.2:1/1.2,e.clientX-r.left,e.clientY-r.top)},{passive:false});
+ var dn=null;st.addEventListener('pointerdown',function(e){dn={x:e.clientX,y:e.clientY}},true);
+ st.addEventListener('click',function(e){if(!op.clic||!dn||!z.listo||Math.abs(e.clientX-dn.x)>5||Math.abs(e.clientY-dn.y)>5)return;var r=st.getBoundingClientRect();
+  op.clic(((e.clientX-r.left)-z.tx)/z.s/z.bw,((e.clientY-r.top)-z.ty)/z.s/z.bh)});
  st.addEventListener('pointerdown',function(e){if(e.button!==0||!st.classList.contains('zoom')||e.target.closest('button'))return;arr={x:e.clientX,y:e.clientY,tx:z.tx,ty:z.ty};st.setPointerCapture(e.pointerId);st.classList.add('arr')});
  st.addEventListener('pointermove',function(e){if(!arr)return;z.tx=arr.tx+e.clientX-arr.x;z.ty=arr.ty+e.clientY-arr.y;poner()});
  function fin(){arr=null;st.classList.remove('arr')}st.addEventListener('pointerup',fin);st.addEventListener('pointercancel',fin);
@@ -451,7 +475,14 @@ function Zoomer(st,zw,im,op){var z={s:1,tx:0,ty:0,bw:0,bh:0,min:1,ini:1,cont:1,l
  im.addEventListener('load',function(){ajustar()});
  return{ajustar:ajustar,centro:centro,z:z}}
 var ZF=Zoomer($('kSt'),$('kZW'),$('kLbI'),{rot:function(){return CUR?rotDe(LBI):0}});
-var ZA=Zoomer($('kASt'),$('kAZW'),$('kAI'),{ancho:true});
+var ZA=Zoomer($('kASt'),$('kAZW'),$('kAI'),{ancho:true,clic:function(x,y){var a=(K[CUR.o]||{}).acta||{},b=a.obsBox;if(b&&y>=b[0]-0.005&&y<=b[1]+0.005)verObs()}});
+/* el mismo cuadro de observaciones del acta, ampliado en el centro; tocar el fondo vuelve al acta */
+function verObs(){var a=(K[CUR.o]||{}).acta||{},b=a.obsBox,im=$('kAI'),c=$('kAObsT');c.innerHTML='';
+ if(b&&im.naturalWidth){var W=im.naturalWidth,H=im.naturalHeight,y0=Math.max(0,Math.floor(b[0]*H)-4),y1=Math.min(H,Math.ceil(b[1]*H)+4),cv=document.createElement('canvas');
+  cv.width=W;cv.height=y1-y0;cv.getContext('2d').drawImage(im,0,y0,W,y1-y0,0,0,W,y1-y0);c.appendChild(cv);c.classList.remove('txt')}
+ else{c.textContent=a.obsTxt||'No se pudo encontrar el comentario en esta acta. Usa el botón PDF.';c.classList.add('txt')}
+ $('kAObs').hidden=false}
+$('kAObsB').onclick=verObs;$('kAObs').onclick=function(e){if(e.target===this)this.hidden=true};
 function zAjustar(){ZF.ajustar()}function zCentro(f){ZF.centro(f)}
 function girar(g){if(!puedo())return;var k=kk(CUR.o),m=k.fotos[LBI]||(k.fotos[LBI]={});m.rot=(((m.rot||0)+g)%360+360)%360;k.t=Date.now();guardarLocal();subir(CUR.o);ZF.ajustar()}
 window.addEventListener('resize',function(){if(LBabierto()){ZF.ajustar();ZA.ajustar()}});
@@ -657,6 +688,7 @@ $('kDet').onclick=async function(e){var t=e.target;
  else if(t.id==='kVerPdf')verPdf(CUR.o)};
 $('kDet').oninput=inputObs;
 document.addEventListener('keydown',function(e){
+ if(!$('kAObs').hidden&&e.key==='Escape'){$('kAObs').hidden=true;return}
  if(!$('kPdfOv').hidden&&e.key==='Escape'){$('kPdfX').click();return}
  if(sec.hidden||!LBabierto())return;if(/INPUT|TEXTAREA|SELECT/.test((e.target||{}).tagName||'')){if(e.key==='Escape'||e.key==='Enter')e.target.blur();return}
  var kx=e.key.toLowerCase();

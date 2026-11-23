@@ -153,3 +153,12 @@
 #tChk .kin{cursor:default}#tChk .kin:hover{color:var(--tx)}
 #tRev .rvt tr.lib td{background:color-mix(in srgb,#3a9ad9 16%,var(--card))}
 #tRev .kseg button.lbs:not(.on){color:#2f8fd0}#tRev .kseg button.lbs.on{background:#3a9ad9;color:#fff}
+
+/* comentario del acta ampliado en el centro */
+#tChk .klbw{position:relative}
+#tChk .kobov{position:absolute;inset:0;z-index:5;background:rgba(10,12,20,.6);display:flex;align-items:center;justify-content:flex-start;padding:10px 0;cursor:zoom-out;border-radius:8px}
+#tChk .kobov[hidden]{display:none}
+#tChk .kobbox{background:#fff;border-radius:6px;box-shadow:0 10px 40px rgba(0,0,0,.55);width:min(62%,1000px);max-height:100%;overflow:auto;cursor:default}
+#tChk .kobbox canvas{display:block;width:100%;height:auto}
+#tChk .kobbox.txt{color:#1a1a1a;padding:16px 18px;font:15px/1.6 Arial,Helvetica,sans-serif}
+#tChk .klba{position:relative}
