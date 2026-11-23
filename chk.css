@@ -164,11 +164,11 @@
 #tChk .klba{position:relative}
 
 /* fila del resultado debajo del técnico */
-#tChk .kri{overflow-x:auto;border:1px solid var(--ln);border-radius:6px;margin:6px 0 8px;background:var(--card)}
-#tChk .kri table{border-collapse:collapse;width:100%;font-size:11.5px;min-width:1100px}
-#tChk .kri th{background:color-mix(in srgb,var(--ok) 14%,var(--card));color:var(--ok);font-weight:700;text-align:left;padding:6px 7px;border-bottom:1px solid var(--ln);vertical-align:bottom;font-size:10.5px}
-#tChk .kri td{padding:6px 7px;vertical-align:top;color:var(--tx);max-width:190px}
-#tChk .kri td.rr{color:var(--er);font-weight:800}
+#tChk .krf{overflow-x:auto;border:1px solid var(--ln);border-radius:6px;margin:6px 0 8px;background:var(--card)}
+#tChk .krf table{border-collapse:collapse;width:100%;font-size:11.5px;min-width:820px}
+#tChk .krf th{background:color-mix(in srgb,var(--ok) 14%,var(--card));color:var(--ok);font-weight:700;text-align:left;padding:6px 7px;border-bottom:1px solid var(--ln);vertical-align:bottom;font-size:10.5px}
+#tChk .krf td{padding:6px 7px;vertical-align:top;color:var(--tx);max-width:190px}
+#tChk .krf td.rr{color:var(--er);font-weight:800}
 #tChk .ktg{display:inline-block;font-size:9px;font-weight:800;border:1px solid;border-radius:8px;padding:0 5px;margin:1px 2px 1px 0;white-space:nowrap}
 #tChk .ktg.er{color:var(--er)}#tChk .ktg.wn{color:var(--wn)}#tChk .ktg.ok{color:var(--ok)}#tChk .ktg.pu,#tChk .ktg.lb{color:#2f8fd0}
 #tChk .kpl{display:inline-block;font-size:10px;font-weight:800;border-radius:9px;padding:1px 7px;white-space:nowrap}

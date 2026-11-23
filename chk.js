@@ -84,7 +84,7 @@ function est(o){var k=K[o],x=ORDM[o];if(!k){if(x&&(x.lib||reNic(x)))return'LIBER
  var lt=k.lib?k.lib.t:0;if(k.fin&&k.fin.t>lt)return'AUDITADA';
  if(k.lib)return'LIBERADA';
  if(x&&(x.lib||reNic(x)))return'LIBERADA';if(k.fin)return'AUDITADA';
- if(itemsCon(k))return'EN REVISIÓN';var f=k.fotos||{};return Object.keys(f).some(function(i){return f[i].item})?'EN REVISIÓN':'PENDIENTE'}
+ if(itemsCon(k))return'PENDIENTE';var f=k.fotos||{};return'PENDIENTE'}
 function fechaCorta(t){try{return new Date(t).toLocaleString('es-CO',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}catch(e){return''}}
 function sello(m){m.por=ana();m.t=Date.now()}
 function guardar(o){o=o||CUR.o;var k=kk(o);k.ana=ana()||k.ana;k.t=Date.now();guardarLocal();subir(o);lista()}
@@ -350,7 +350,9 @@ async function estadoLock(o){var l=null;try{var d=db();if(d){var r=await d.doc('
  else CUR.ro=ana()?COMP:'Escoge tu nombre en "Analista" arriba para revisar esta orden.';
  pintar();lista();if(LBabierto())lbPanel()}
 async function comprometer(){if(!CUR)return;var o=CUR.o;if(!ana()){toast('Escoge primero tu nombre en "Analista".',true);$('kAna').focus();return}
- var antes=TOM,j=await tomarOrden(o);if(!CUR||CUR.o!==o)return;
+ var antes=TOM,j=await tomarOrden(o);
+ if(j.tomada&&antes&&antes!==o&&K[antes]&&est(antes)!=='AUDITADA'){var ka=K[antes];ka.items={};ka.obs='';Object.keys(ka.fotos||{}).forEach(function(i){delete ka.fotos[i].item});ka.t=Date.now();guardarLocal();subir(antes)}   /* la otra orden vuelve en blanco */
+ if(!CUR||CUR.o!==o)return;
  if(j.tomada){Object.keys(LOCKS).forEach(function(k){if(k!==o&&LOCKS[k]&&LOCKS[k].por===ana())delete LOCKS[k]});CUR.ro='';toast('Orden '+o+' comprometida'+(antes&&antes!==o?' (se soltó la '+antes+')':''))}
  else CUR.ro=j.por?msgOtro(j.por,j.desde):COMP;
  pintar();lista();if(LBabierto())lbPanel()}
@@ -382,24 +384,24 @@ function fuenteTxt(E){var s=SUBE[CUR.o]||{};
   s.txt?'<span class="mu sm">'+esc(s.txt)+'</span>':s.ok?'<span class="kok">Guardadas en Drive ✓</span>':'';
  return(de?'<span class="mu sm">'+de+'</span>':'')+dr}
 function cabecera(){var x=CUR.x,k=K[CUR.o]||{},e=est(CUR.o),E=E_();
- return'<div class="kch" id="kCab"><b>Orden '+esc(x.o)+'</b><span class="mu">NIC '+esc(x.nic)+' · '+esc(x.tec)+' · '+esc(x.fecha)+' '+esc(x.hora)+'</span>'+
+ return'<div id="kCabW"><div class="kch" id="kCab"><b>Orden '+esc(x.o)+'</b><span class="mu">NIC '+esc(x.nic)+' · '+esc(x.tec)+' · '+esc(x.fecha)+' '+esc(x.hora)+'</span>'+
   '<span class="ke big '+ecl(e)+'">'+e+'</span>'+
   (k.fin?'<span class="mu sm">Cerrada por '+esc(k.fin.por||'?')+' el '+esc(fechaCorta(k.fin.t))+'</span>':'')+
   '<span style="flex:1"></span>'+fuenteTxt(E)+'<button type="button" class="kpdf" id="kVerPdf">PDF</button></div>'+
-  (CUR.ro?'<div class="kro">🔒 '+esc(CUR.ro)+(CUR.ro===COMP?' <button type="button" class="kbt si" data-comp="1">⭐ Comprometer</button>':'')+(/En revisión por/.test(CUR.ro)?' <button type="button" class="b s" id="kLib">Liberar (admin)</button>':'')+'</div>':'')}
-function pintarCab(){var c=$('kCab');if(c&&CUR)c.outerHTML=cabecera()}
+  (CUR.ro?'<div class="kro">🔒 '+esc(CUR.ro)+(CUR.ro===COMP?' <button type="button" class="kbt si" data-comp="1">⭐ Comprometer</button>':'')+(/En revisión por/.test(CUR.ro)?' <button type="button" class="b s" id="kLib">Liberar (admin)</button>':'')+'</div>':'')+'</div>'}
+function pintarCab(){var c=$('kCabW');if(c&&CUR)c.outerHTML=cabecera()}
 function serialHtml(){var k=K[CUR.o]||{},a=k.acta||{},s=k.serial;
  var t='<div class="kser"><div><span class="mu sm">Serial medidor instalado (acta)</span><b>'+esc(a.cambioMed==='SI'?(a.medInst||'—'):a.cambioMed?'No se cambió medidor':'—')+'</b></div>';
  if(s)t+='<div><span class="mu sm">Leído '+(s.via==='barras'?'del código de barras':'por la IA')+'</span><b>'+esc(s.leido||'—')+'</b></div><span class="ksr big '+(s.res==='CONFORME'?'ok':s.res==='NO CONFORME'?'er':'')+'">'+esc(SER[s.res]||s.res)+'</span>'+
   (s.foto>=0?'<button type="button" class="b s" data-ir="'+s.foto+'">Ver foto '+(s.foto+1)+'</button>':'')+(s.aviso?'<span class="mu sm">'+esc(s.aviso)+'</span>':'');
  t+='<button type="button" class="b s" id="kSer1">'+(s?'Volver a verificar':'Verificar serial')+'</button></div>';return t}
 /* la fila del resultado de esta orden, debajo del técnico (mismas columnas de la tabla de Resultado) */
-var RCOLS=[['Proceso','Proceso'],['Tipo Orden','Tipo orden'],['IRREGULARIDAD','Irregularidad'],['TIPO DE IRRE','Tipo de irre'],['APLICA PARE','PARE'],['SE NECESITA VIDEO','Nec. video'],
+var RCOLS=[['APLICA PARE','PARE'],['SE NECESITA VIDEO','Nec. video'],
  ['LO SUBIÓ AL APLICATIVO','Subió video'],['APOYO CARRO CANASTA','Canasta'],['NOVEDAD IRREGULARIDAD','Novedad irreg.'],['Resultado','Resultado'],['Cobro mal','Cobro mal'],
  ['Mano de obra cobrada mal','M. obra cobrada mal'],['Materiales cobrados mal','Materiales cobrados mal'],['Detalle','Detalle'],['_alertas','Alertas'],['_crit','Criterio']];
 function infoRes(){var A=window.rFilas?window.rFilas():[],r=null;for(var i=0;i<A.length;i++)if(rv(A[i],'Orden')===CUR.o){r=A[i];break}
  if(!r)return'';
- return'<div class="kri"><table><thead><tr>'+RCOLS.map(function(c){return'<th>'+esc(c[1])+'</th>'}).join('')+'</tr></thead><tbody><tr>'+RCOLS.map(function(c){var k=c[0],v;
+ return'<div class="krf"><table><thead><tr>'+RCOLS.map(function(c){return'<th>'+esc(c[1])+'</th>'}).join('')+'</tr></thead><tbody><tr>'+RCOLS.map(function(c){var k=c[0],v;
   if(k==='_alertas')return'<td>'+(r._tags||[]).map(function(t){return'<span class="ktg '+esc(t[0])+'">'+esc(t[1])+'</span>'}).join('')+'</td>';
   if(k==='_crit')return'<td>'+String(r._crit||'').split(' ').filter(Boolean).map(function(x){return'<span class="ktg '+(x[0]==='C'||x[0]==='T'?'er':'wn')+'">'+esc(x)+'</span>'}).join('')+'</td>';
   v=rv(r,k);if(k==='Proceso'&&v==='CAMPANA')v='CAMPAÑA';
