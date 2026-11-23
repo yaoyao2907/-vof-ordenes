@@ -145,3 +145,11 @@
 #tRev .rvnc{color:var(--er);white-space:normal;min-width:160px}#tRev .rvob{white-space:normal;min-width:240px;max-width:420px}
 #tRev .ke{font-size:10px;font-weight:800;padding:1px 6px;border-radius:3px;border:1px solid var(--ln)}#tRev .ke.ok{color:var(--ok);border-color:var(--ok)}#tRev .ke.wn{color:var(--wn);border-color:var(--wn)}
 #tChk .kf[hidden]{display:none}
+/* liberadas (azul claro) */
+#tChk .ke.lb,#tRev .ke.lb{color:#2f8fd0;border-color:#3a9ad9;background:color-mix(in srgb,#3a9ad9 14%,transparent)}
+#tChk .kit.lib{background:color-mix(in srgb,#3a9ad9 16%,var(--card));border-left:3px solid #3a9ad9}
+#tChk .kbt.lbb{background:#3a9ad9;border-color:#3a9ad9;color:#fff}#tChk .kbt.lbb:hover{filter:brightness(1.08)}
+#tChk .klbx{background:color-mix(in srgb,#3a9ad9 14%,var(--card));border:1px solid #3a9ad9;border-radius:5px;padding:8px 10px;font-size:12px;margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+#tChk .kin{cursor:default}#tChk .kin:hover{color:var(--tx)}
+#tRev .rvt tr.lib td{background:color-mix(in srgb,#3a9ad9 16%,var(--card))}
+#tRev .kseg button.lbs:not(.on){color:#2f8fd0}#tRev .kseg button.lbs.on{background:#3a9ad9;color:#fff}

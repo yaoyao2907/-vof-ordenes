@@ -64,9 +64,20 @@ function fk(f){var m=String(f).match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);return m?m
 function dk(d){return d.getFullYear()+('0'+(d.getMonth()+1)).slice(-2)+('0'+d.getDate()).slice(-2)}
 function L(s){return String(s==null?'':s).toUpperCase().replace(/[^A-Z0-9]/g,'').replace(/^0+/,'')}
 function igual(a,b){a=L(a);b=L(b);if(!a||!b||b.length<4)return null;return a===b||(b.length>=6&&(a.indexOf(b)>=0||b.indexOf(a)>=0))}
+window.kEstado=function(o){return ORDM[o]?est(o):''};
+function ecl(e){return e==='FINALIZADA'?'ok':e==='EN REVISIÓN'?'wn':/^LIBERADA/.test(e)?'lb':''}
 function kk(o){var k=K[o]||(K[o]={t:0});if(!k.fotos)k.fotos={};if(!k.items)k.items={};return k}
 function itemsCon(k){var it=(k||{}).items||{};return ITEMS.filter(function(t){return(it[t[0]]||{}).e}).length}
-function est(o){var k=K[o];if(!k)return'PENDIENTE';if(k.fin)return'FINALIZADA';
+/* LIBERADA: la orden quedó mal y se vuelve a hacer. LIBERADA PENDIENTE: volvió a aparecer (misma OS con otra visita, o el mismo NIC en otra OS) y falta revisarla. */
+var ORDM={},LIBNIC={},LIBT=0;
+function armarLib(){if(Date.now()-LIBT<400)return;LIBT=Date.now();LIBNIC={};
+ Object.keys(K).forEach(function(o){var l=K[o]&&K[o].lib;if(!l)return;var nic=l.nic||(ORDM[o]||{}).nic;if(!nic)return;(LIBNIC[nic]=LIBNIC[nic]||[]).push({o:o,k:fk(l.fecha||(ORDM[o]||{}).fecha||'')})})}
+function reNic(x){armarLib();var L=LIBNIC[x.nic];if(!x.nic||!L)return'';for(var i=0;i<L.length;i++)if(L[i].o!==x.o&&String(x.k||'')>=String(L[i].k||''))return L[i].o;return''}
+function reOS(o){var k=K[o],x=ORDM[o];return!!(k&&k.lib&&x&&!x.lib&&x.fecha&&k.lib.fecha&&x.fecha!==k.lib.fecha)}
+function est(o){var k=K[o],x=ORDM[o];if(!k){if(x&&x.lib)return'LIBERADA';if(x&&reNic(x))return'LIBERADA PENDIENTE';return'PENDIENTE'}
+ var lt=k.lib?k.lib.t:0;if(k.fin&&k.fin.t>lt)return'FINALIZADA';
+ if(k.lib)return reOS(o)?'LIBERADA PENDIENTE':'LIBERADA';
+ if(x&&(x.lib))return'LIBERADA';if(x&&reNic(x))return'LIBERADA PENDIENTE';if(k.fin)return'FINALIZADA';
  if(itemsCon(k))return'EN REVISIÓN';var f=k.fotos||{};return Object.keys(f).some(function(i){return f[i].item})?'EN REVISIÓN':'PENDIENTE'}
 function fechaCorta(t){try{return new Date(t).toLocaleString('es-CO',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}catch(e){return''}}
 function sello(m){m.por=ana();m.t=Date.now()}
@@ -85,10 +96,13 @@ async function bajarTodo(){var d=db();if(!d)return;
 /* ---------- órdenes (del resultado) ---------- */
 window.kDatos=function(){
  var A=window.rFilas?window.rFilas():[];
- ORD=A.filter(function(r){var o=rv(r,'Orden'),i=rv(r,'IRREGULARIDAD');return /^\d{6,}$/.test(o)&&i!=='NO SE VALIDA'&&i!=='LIBERADA'&&rv(r,'Resultado')!=='LIBERADA'})
-  .map(function(r){return{o:rv(r,'Orden'),nic:rv(r,'NIC'),tec:rv(r,'Técnico'),fecha:rv(r,'Fecha'),hora:rv(r,'Hora'),k:fk(rv(r,'Fecha')),irr:rv(r,'IRREGULARIDAD'),
+ ORD=A.filter(function(r){var o=rv(r,'Orden'),i=rv(r,'IRREGULARIDAD');return /^\d{6,}$/.test(o)&&i!=='NO SE VALIDA'})
+  .map(function(r){return{o:rv(r,'Orden'),lib:rv(r,'Resultado')==='LIBERADA'||rv(r,'IRREGULARIDAD')==='LIBERADA'||/LIBERAD/i.test(rv(r,'Estado orden')),nic:rv(r,'NIC'),tec:rv(r,'Técnico'),fecha:rv(r,'Fecha'),hora:rv(r,'Hora'),k:fk(rv(r,'Fecha')),irr:rv(r,'IRREGULARIDAD'),
    mo:rv(r,'Mano de obra').split(/\s*\|\s*/).map(function(x){return x.trim()}).filter(Boolean),medEnc:rv(r,'MEDIDOR ENCONTRADO')}});
  var u={};ORD=ORD.filter(function(x){if(u[x.o])return false;u[x.o]=1;return true});
+ ORDM={};ORD.forEach(function(x){ORDM[x.o]=x;
+  if(x.lib&&!(K[x.o]&&(K[x.o].lib||K[x.o].libQuit))){var k=kk(x.o);k.lib={t:Date.now(),por:'SIPREM',fecha:x.fecha,nic:x.nic,auto:1};k.t=Date.now();guardarLocal();subir(x.o)}});
+ LIBT=0;
  ORD.sort(function(a,b){return(a.k+a.hora).localeCompare(b.k+b.hora)});
  var ts={},ms={};ORD.forEach(function(x){if(x.tec)ts[x.tec]=1;x.mo.forEach(function(m){ms[m]=(ms[m]||0)+1})});
  $('kTec').innerHTML='<option value="">Técnico: todos</option>'+Object.keys(ts).sort().map(function(t){return'<option'+(t===FILT.tec?' selected':'')+'>'+esc(t)+'</option>'}).join('');
@@ -106,8 +120,8 @@ function base(sinEst,sinSer,sinAsig){var mt=misTecs();var h=new Date(),hoy=dk(h)
   if(!sinSer&&FILT.ser){var s=(K[x.o]||{}).serial;if(FILT.ser==='SIN VERIFICAR'?!!s:!(s&&s.res===FILT.ser))return false}
   return true})}
 function contadores(){
- var B=base(true,false),c={'':B.length,PENDIENTE:0,'EN REVISIÓN':0,FINALIZADA:0};B.forEach(function(x){c[est(x.o)]++});
- $('kEst').innerHTML=[['','Todas'],['PENDIENTE','Pendientes'],['EN REVISIÓN','En revisión'],['FINALIZADA','Finalizadas']].map(function(e){
+ var B=base(true,false),c={'':B.length,PENDIENTE:0,'EN REVISIÓN':0,FINALIZADA:0,LIBERADA:0,'LIBERADA PENDIENTE':0};B.forEach(function(x){c[est(x.o)]++});
+ $('kEst').innerHTML=[['','Todas'],['PENDIENTE','Pendientes'],['EN REVISIÓN','En revisión'],['FINALIZADA','Finalizadas'],['LIBERADA','Liberadas'],['LIBERADA PENDIENTE','Liberada pendiente']].map(function(e){
   return'<button type="button" data-v="'+e[0]+'" class="'+(FILT.est===e[0]?'on':'')+'">'+e[1]+' <b>'+c[e[0]]+'</b></button>'}).join('');
  var S=base(false,true),s={'':S.length,CONFORME:0,'NO CONFORME':0,'SIN LEER':0,'SIN VERIFICAR':0};
  S.forEach(function(x){var r=(K[x.o]||{}).serial;if(!r)s['SIN VERIFICAR']++;else if(s[r.res]!==undefined)s[r.res]++});
@@ -119,11 +133,12 @@ function contadores(){
   '<button type="button" data-v="sin" class="'+(FILT.asig==='sin'?'on':'')+'">Sin asignar <b>'+na.sin+'</b></button>'+
   '<button type="button" data-v="" class="'+(!FILT.asig||(FILT.asig==='mios'&&!mt)?'on':'')+'">Ver todas <b>'+na['']+'</b></button>';
  var fin=c.FINALIZADA;return{fin:fin,tot:B.length}}
-function lista(){
+var tRR=0;
+function lista(){clearTimeout(tRR);tRR=setTimeout(function(){if(window.rRefrescar)window.rRefrescar()},600);
  var cc=contadores(),F=base();
  $('kLst').innerHTML='<div class="klh">'+F.length+' órdenes · <b>'+cc.fin+'</b> finalizadas de '+cc.tot+'</div>'+(F.slice(0,500).map(function(x){var e=est(x.o),k=K[x.o]||{},n=itemsCon(k),s=k.serial;
-  return'<button type="button" class="kit'+(CUR&&CUR.o===x.o?' on':'')+'" data-o="'+esc(x.o)+'"><b>'+esc(x.o)+'</b> <span class="mu">'+esc(x.fecha.slice(0,5))+' '+esc(x.hora.slice(0,5))+'</span><br><span class="sm">'+esc(x.tec||'(sin técnico)')+'</span><br>'+
-   '<span class="ke '+(e==='FINALIZADA'?'ok':e==='EN REVISIÓN'?'wn':'')+'">'+e+'</span>'+(lockDe(x.o)?' <span class="klk" title="La está revisando">🔒 '+esc(lockDe(x.o))+'</span>':'')+(n?' <span class="mu sm">'+n+'/'+ITEMS.length+' ítems</span>':'')+
+  return'<button type="button" class="kit'+(CUR&&CUR.o===x.o?' on':'')+(/^LIBERADA/.test(e)?' lib':'')+'" data-o="'+esc(x.o)+'"><b>'+esc(x.o)+'</b> <span class="mu">'+esc(x.fecha.slice(0,5))+' '+esc(x.hora.slice(0,5))+'</span><br><span class="sm">'+esc(x.tec||'(sin técnico)')+'</span><br>'+
+   '<span class="ke '+ecl(e)+'">'+e+'</span>'+(e==='LIBERADA PENDIENTE'&&reNic(x)?' <span class="mu sm">reemplaza a '+esc(reNic(x))+'</span>':'')+(lockDe(x.o)?' <span class="klk" title="La está revisando">🔒 '+esc(lockDe(x.o))+'</span>':'')+(n?' <span class="mu sm">'+n+'/'+ITEMS.length+' ítems</span>':'')+
    (s?' <span class="ksr '+(s.res==='CONFORME'?'ok':s.res==='NO CONFORME'?'er':'')+'">'+(s.res==='CONFORME'?'serial ✓':s.res==='NO CONFORME'?'serial ✗':s.res==='SIN LEER'?'serial ?':'sin cambio')+'</span>':'')+'</button>'}).join('')||'<p class="mu" style="padding:12px">No hay órdenes con estos filtros.</p>')}
 
 /* ================= FOTOS: navegador (IndexedDB) → Drive → PDF ================= */
@@ -132,6 +147,7 @@ function idb(){if(!IDBP)IDBP=new Promise(function(ok){try{var r=indexedDB.open('
  r.onsuccess=function(){ok(r.result)};r.onerror=function(){ok(null)};r.onblocked=function(){ok(null)}}catch(e){ok(null)}});return IDBP}
 async function idbGet(o){var d=await idb();if(!d)return null;
  return new Promise(function(ok){try{var q=d.transaction('o').objectStore('o').get(o);q.onsuccess=function(){ok(q.result||null)};q.onerror=function(){ok(null)}}catch(e){ok(null)}})}
+async function idbDel(o){var d=await idb();if(!d)return;await new Promise(function(ok){try{var tx=d.transaction('o','readwrite');tx.objectStore('o').delete(o);tx.oncomplete=ok;tx.onerror=ok;tx.onabort=ok}catch(e){ok()}})}
 async function idbPut(o,v){var d=await idb();if(!d)return;
  await new Promise(function(ok){try{var tx=d.transaction('o','readwrite');tx.objectStore('o').put(v,o);tx.oncomplete=ok;tx.onerror=ok;tx.onabort=ok}catch(e){ok()}});
  var m={};try{m=JSON.parse(localStorage.getItem('vof_fotos_t')||'{}')||{}}catch(e){}m[o]=Date.now();var ks=Object.keys(m);
@@ -301,7 +317,9 @@ async function liberarAdmin(){var o=CUR.o,c=prompt('Clave de administrador para 
 
 /* ================= ABRIR Y PINTAR ================= */
 window.kAbrir=function(o){if(!arr)window.kMostrar();abrir(o)};
-function abrir(o,u8){GEN++;var gen=GEN;
+function abrir(o,u8){
+ var kl=K[o]&&K[o].lib,xl=ORDM[o];if(kl&&reOS(o)&&kl.reini!==xl.fecha){toast('La orden '+o+' volvió con otra visita: se empieza la revisión de cero.');reiniciarLib(o).then(function(){abrir(o,u8)});return}
+ GEN++;var gen=GEN;
  var x=ORD.filter(function(y){return y.o===o})[0]||{o:o,nic:'',tec:'',fecha:'',hora:'',irr:'',mo:[]};
  if(LBabierto())lbCerrar(true);
  if(TOM&&TOM!==o)soltarOrden(TOM);
@@ -323,7 +341,7 @@ function fuenteTxt(E){var s=SUBE[CUR.o]||{};
  return(de?'<span class="mu sm">'+de+'</span>':'')+dr}
 function cabecera(){var x=CUR.x,k=K[CUR.o]||{},e=est(CUR.o),E=E_();
  return'<div class="kch" id="kCab"><b>Orden '+esc(x.o)+'</b><span class="mu">NIC '+esc(x.nic)+' · '+esc(x.tec)+' · '+esc(x.fecha)+' '+esc(x.hora)+'</span>'+
-  '<span class="ke big '+(e==='FINALIZADA'?'ok':e==='EN REVISIÓN'?'wn':'')+'">'+e+'</span>'+
+  '<span class="ke big '+ecl(e)+'">'+e+'</span>'+
   (k.fin?'<span class="mu sm">Cerrada por '+esc(k.fin.por||'?')+' el '+esc(fechaCorta(k.fin.t))+'</span>':'')+
   '<span style="flex:1"></span>'+fuenteTxt(E)+'<button type="button" class="kpdf" id="kVerPdf">PDF</button></div>'+
   (CUR.ro?'<div class="kro">🔒 '+esc(CUR.ro)+(/En revisión por/.test(CUR.ro)?' <button type="button" class="b s" id="kLib">Liberar (admin)</button>':'')+'</div>':'')}
@@ -341,10 +359,10 @@ function chip(i){return'';var it=itemDe(i);if(!it)return'<span class="kchip nada
 /* lista de los 14 ítems (sirve en el visor y en el resumen) */
 function itemsHtml(lb){var k=K[CUR.o]||{},it=k.items||{},fm=k.fotos||{},n=E_().fotos.length,cnt={};
  Object.keys(fm).forEach(function(i){var t=fm[i].item;if(t&&(+i<n||!n))cnt[t]=(cnt[t]||0)+1});
- var act=lb?itemDe(LBI):'';
+ var act='';
  return'<div class="kits">'+ITEMS.map(function(t){var m=it[t[0]]||{},e=m.e||'',id=t[0];
   return'<div class="kir'+(e==='C'?' c':e==='NC'?' nc':e==='NA'?' na':'')+(act===id?' act':'')+'">'+
-   '<button type="button" class="kin" data-it="'+id+'" title="'+(lb?'Esta foto es de: ':'Ver las fotos de: ')+esc(t[1])+'">'+(act===id?'📷 ':'')+esc(t[1])+(cnt[id]?' <small>'+cnt[id]+'</small>':'')+'</button>'+
+   '<span class="kin">'+esc(t[1])+'</span>'+
    '<span class="kie"><button type="button" data-ie="C" data-id="'+id+'" class="'+(e==='C'?'on':'')+'" title="Conforme">✓</button>'+
    '<button type="button" data-ie="NC" data-id="'+id+'" class="'+(e==='NC'?'on':'')+'" title="No conforme">✗</button>'+
    '<button type="button" data-ie="NA" data-id="'+id+'" class="'+(e==='NA'?'on':'')+'" title="No aplica">N/A</button></span></div>'}).join('')+'</div>'}
@@ -353,9 +371,13 @@ function fotosDeItem(id){var f=(K[CUR.o]||{}).fotos||{},n=E_().fotos.length;retu
 function resumen(){var k=K[CUR.o]||{},it=k.items||{},hechos=itemsCon(k),nc=ITEMS.filter(function(t){return(it[t[0]]||{}).e==='NC'});
  var h='<div class="kres"><h3>Revisión de la orden <span class="mu sm">'+hechos+' de '+ITEMS.length+' ítems con estado</span></h3>'+itemsHtml(false)+obsHtml(false);
  if(nc.length)h+='<div class="knc"><b>No conformes</b>'+nc.map(function(t){var fs=fotosDeItem(t[0]);
-  return'<div class="knci"><b>'+esc(t[1])+'</b>'+fs.map(function(i){return' <button type="button" class="kfb" data-ir="'+i+'">foto '+(i+1)+'</button>'}).join('')+'</div>'}).join('')+'</div>';
- h+='<div class="kfin">'+(k.fin?'<button type="button" class="kbt no big" id="kReab">Reabrir orden</button><span class="mu sm">Resultado: <b>'+esc(k.fin.res||'')+'</b></span>':
-  (CUR.ro?'':'<button type="button" class="kbt si big" id="kFin">✓ Finalizar orden</button>')+'<span class="mu sm">'+(hechos<ITEMS.length?'Faltan '+(ITEMS.length-hechos)+' ítems sin estado.':'Los 14 ítems tienen estado.')+'</span>')+'</div></div>';return h}
+  return'<div class="knci"><b>'+esc(t[1])+'</b></div>'}).join('')+'</div>';
+ var e=est(CUR.o),x=ORDM[CUR.o]||CUR.x,rn=x?reNic(x):'';
+ if(e==='LIBERADA')h+='<div class="klbx">🔵 <b>LIBERADA</b> por '+esc(k.lib.por||'?')+' el '+esc(fechaCorta(k.lib.t))+'. Queda pendiente hasta que la orden se vuelva a hacer.'+(CUR.ro?'':' <button type="button" class="b s" id="kDesLib">Quitar liberada</button>')+'</div>';
+ if(e==='LIBERADA PENDIENTE')h+='<div class="klbx">🔵 <b>LIBERADA PENDIENTE</b>: '+(rn?'el NIC '+esc(x.nic)+' se liberó en la orden '+esc(rn):'esta orden se liberó el '+esc(fechaCorta(k.lib.t))+' y volvió con otra visita')+'. Revísala y finalízala.</div>';
+ var bLib=CUR.ro||e==='LIBERADA'?'':'<button type="button" class="kbt lbb big" id="kLibe">🔵 Liberada</button>';
+ h+='<div class="kfin">'+(k.fin&&e==='FINALIZADA'?'<button type="button" class="kbt no big" id="kReab">Reabrir orden</button>'+bLib+'<span class="mu sm">Resultado: <b>'+esc(k.fin.res||'')+'</b></span>':
+  (CUR.ro||e==='LIBERADA'?'':'<button type="button" class="kbt si big" id="kFin">✓ Finalizar orden</button>')+bLib+'<span class="mu sm">'+(hechos<ITEMS.length?'Faltan '+(ITEMS.length-hechos)+' ítems sin estado.':'Los 14 ítems tienen estado.')+'</span>')+'</div></div>';return h}
 function pintar(){
  if(!CUR){$('kDet').innerHTML='<div class="kvac"><b>Escoge una orden de la lista</b><p class="mu">Salen todas las fotos del acta. Dale clic a una para verla grande junto al acta recortada y marcar los 14 ítems. Todo se guarda solo en la nube.</p></div>';return}
  var E=E_(),k=K[CUR.o]||{},a=k.acta||{};
@@ -367,19 +389,18 @@ function pintar(){
   (E.listo?'':'<div class="kprog"><span class="spin"></span> '+esc(E.estado||'')+'</div>')+
   (!E.fotos.length?'<p class="mu">El acta no trae fotos.</p>':'')+
   '<div class="kgal">'+E.fotos.map(function(f,i){var it=itemDe(i),e=(((k.items||{})[it])||{}).e,r=rotDe(i);
-   return'<button type="button" class="kth'+(e==='NC'?' nc':e==='C'?' c':'')+'" data-f="'+i+'"><img src="'+f.u+'" alt="Foto '+(i+1)+'" loading="lazy"'+(r?' style="transform:rotate('+r+'deg)"':'')+'><span class="kn">'+(i+1)+'</span>'+chip(i)+'</button>'}).join('')+'</div>'+
+   return'<button type="button" class="kth" data-f="'+i+'"><img src="'+f.u+'" alt="Foto '+(i+1)+'" loading="lazy"'+(r?' style="transform:rotate('+r+'deg)"':'')+'><span class="kn">'+(i+1)+'</span>'+chip(i)+'</button>'}).join('')+'</div>'+
   resumen()}
 
 /* clics en la lista de ítems (visor o resumen) */
 function clicItems(e,lb){var t=e.target.closest('button');if(!t)return false;
  if((t.dataset.it&&lb)||t.dataset.ie){if(!puedo())return true}
- if(false){var id=t.dataset.it;
+ if(t.dataset.it){var id=t.dataset.it;
   if(lb){var k=kk(CUR.o),m=k.fotos[LBI]||(k.fotos[LBI]={});m.item=m.item===id?'':id;sello(m);guardar();lbPanel();pintarMini()}
   else{var fs=fotosDeItem(id);if(fs.length)lbAbrir(fs[0]);else toast('Ninguna foto está marcada como "'+TN[id]+'". Abre una foto y toca el ítem.')}
   return true}
  if(t.dataset.ie){var id2=t.dataset.id,k2=kk(CUR.o);k2.items=k2.items||{};var m2=k2.items[id2]||(k2.items[id2]={});
   m2.e=m2.e===t.dataset.ie?'':t.dataset.ie;sello(m2);
-  if(false){var mf=k2.fotos[LBI]||(k2.fotos[LBI]={});mf.item=id2;sello(mf)}            /* la foto en la que estás queda de ese ítem */
   guardar();if(lb)lbPanel();else pintar();return true}
  return false}
 function inputObs(e){if(!e.target.dataset||!e.target.dataset.obsg||CUR.ro)return;var k=kk(CUR.o);k.obs=e.target.value;k.ana=ana();k.t=Date.now();guardarLocal();subir(CUR.o);
@@ -400,10 +421,10 @@ function lbFoto(){var E=E_(),f=E.fotos[LBI];if(!f){$('kLbI').removeAttribute('sr
  var im=$('kLbI');if(im.getAttribute('src')===f.u)ZF.ajustar();else im.src=f.u;lbCap();
  $('kLbP').disabled=LBI<=0;$('kLbN').disabled=LBI>=E.fotos.length-1}
 function lbPanel(){var k=K[CUR.o]||{},it=itemDe(LBI);
- $('kLbPan').innerHTML='<div class="kpt2">Foto '+(LBI+1)+' <span class="mu sm">'+(it?'es de: <b>'+esc(TN[it])+'</b>':'toca el ítem al que pertenece')+'</span></div>'+itemsHtml(true)+
+ $('kLbPan').innerHTML='<div class="kpt2">Foto '+(LBI+1)+' de '+E_().fotos.length+'</div>'+itemsHtml(true)+
   '<div class="knav"><button type="button" class="b s" data-n="-1">← Anterior</button><button type="button" class="b s" data-n="1">Siguiente →</button></div>'+
   obsHtml(true)+
-  '<div class="mu sm">Marcar ✓ ✗ N/A deja esta foto en ese ítem. Teclas: ← → pasar · rueda = zoom · C / N / A = estado del ítem de esta foto · R girar · Esc cerrar</div>'+
+  '<div class="mu sm">Teclas: ← → pasar · rueda = zoom · R girar · Esc cerrar</div>'+
   (CUR.ro?'<div class="kro">🔒 '+esc(CUR.ro)+'</div>':'')+(k.fin?'<div class="kmsg">La orden está finalizada: si cambias algo, reábrela.</div>':'')}
 function lbIr(n){var E=E_();if(n<0||n>=E.fotos.length)return;LBI=n;lbFoto();lbPanel()}
 
@@ -457,8 +478,23 @@ function finalizar(){if(!puedo())return;var k=kk(CUR.o);if(!ana()){toast('Escoge
  if(falta&&!confirm('Faltan '+falta+' ítems sin estado. ¿Finalizar la orden igual?'))return;
  k.fin={t:Date.now(),por:ana(),res:nc.length?'CON NOVEDAD ('+nc.map(function(t){return t[1]}).join(', ')+')':falta?'SIN NOVEDAD · '+falta+' ítems sin revisar':'CONFORME'};
  k.ana=ana();k.t=Date.now();guardarLocal();subir(CUR.o);toast('Orden '+CUR.o+' finalizada');
- var F=base().filter(function(y){return y.o!==CUR.o&&est(y.o)!=='FINALIZADA'&&!lockDe(y.o)});if(F.length)abrir(F[0].o);else{soltarOrden(CUR.o);CUR.ro='Orden finalizada.';pintar();lista()}}
-function reabrir(){if(CUR.ro==='Orden finalizada.'){CUR.ro='';tomarOrden(CUR.o)}if(!puedo())return;var k=kk(CUR.o);delete k.fin;k.t=Date.now();guardarLocal();subir(CUR.o);pintar();lista()}
+ siguiente()}
+function siguiente(){var F=base().filter(function(y){return y.o!==CUR.o&&!/FINALIZADA|^LIBERADA$/.test(est(y.o))&&!lockDe(y.o)});if(F.length)abrir(F[0].o);else{soltarOrden(CUR.o);CUR.ro=CERR;pintar();lista()}}
+var CERR='Orden cerrada: vuelve a abrirla desde la lista para seguir.';
+function liberar(){if(!puedo())return;if(!ana()){toast('Escoge tu nombre en "Analista" arriba.',true);$('kAna').focus();return}
+ if(!confirm('¿Marcar la orden '+CUR.o+' como LIBERADA?\nQueda pendiente hasta que se vuelva a realizar.'))return;
+ var k=kk(CUR.o),x=ORDM[CUR.o]||CUR.x||{},a=k.acta||{},it=k.items||{};
+ k.lib={t:Date.now(),por:ana(),fecha:x.fecha||a.fecha||'',nic:x.nic||a.nic||'',nc:ITEMS.filter(function(t){return(it[t[0]]||{}).e==='NC'}).map(function(t){return t[1]}).join(', ')};
+ delete k.libQuit;k.ana=ana();k.t=Date.now();LIBT=0;guardarLocal();subir(CUR.o);toast('Orden '+CUR.o+' liberada');siguiente()}
+function quitarLib(){if(CUR.ro===CERR){CUR.ro='';tomarOrden(CUR.o)}if(!puedo())return;if(!confirm('¿Quitarle el estado LIBERADA a la orden '+CUR.o+'?'))return;var k=kk(CUR.o);delete k.lib;k.libQuit=true;k.t=Date.now();LIBT=0;guardarLocal();subir(CUR.o);pintar();lista()}
+/* misma OS que volvió con otra visita: lo revisado antes se guarda aparte y se empieza de cero (fotos nuevas del PDF nuevo) */
+async function reiniciarLib(o){var k=kk(o),x=ORDM[o]||{};
+ (k.antes=k.antes||[]).push({items:k.items,fotos:k.fotos,obs:k.obs||'',serial:k.serial||null,fin:k.fin||null,lib:k.lib,acta:k.acta||null});
+ k.items={};k.fotos={};k.obs='';delete k.serial;delete k.acta;delete k.fin;k.lib.reini=x.fecha;k.t=Date.now();guardarLocal();subir(o);
+ var E=MEM[o];if(E){delete MEM[o];MEML=MEML.filter(function(y){return y!==o});soltar(E)}
+ await idbDel(o);delete SUBE[o];
+ if(window.vofPuente)try{await window.vofPuente('fotos_archivar',{orden:o})}catch(e){}}
+function reabrir(){if(CUR.ro===CERR){CUR.ro='';tomarOrden(CUR.o)}if(!puedo())return;var k=kk(CUR.o);delete k.fin;k.t=Date.now();guardarLocal();subir(CUR.o);pintar();lista()}
 
 /* ---------- seriales: código de barras (ZXing) y, si no se lee, IA ---------- */
 var ZX=null;
@@ -571,28 +607,30 @@ rsec.innerHTML='<div class="khd"><b>Revisiones</b><span class="mu" id="rvInfo"><
  '<div class="rvw"><table class="rvt" id="rvT"></table></div>';
 var RVF={dia:'',fe:'',ana:'',tec:'',est:'',q:''};
 function rvFilas(){var M={};ORD.forEach(function(x){M[x.o]=x});
- return Object.keys(K).filter(function(o){return /^\d{6,}$/.test(o)&&est(o)!=='PENDIENTE'||(K[o]&&K[o].obs)}).map(function(o){var k=K[o],x=M[o]||{},a=k.acta||{},it=k.items||{};
+ var os=Object.keys(K).filter(function(o){return /^\d{6,}$/.test(o)&&(est(o)!=='PENDIENTE'||(K[o]&&K[o].obs))});
+ ORD.forEach(function(x){if(!K[x.o]&&/^LIBERADA/.test(est(x.o)))os.push(x.o)});
+ return os.map(function(o){var k=K[o]||{},x=M[o]||{},a=k.acta||{},it=k.items||{};
   var por=k.fin?k.fin.por:k.ana;if(!por){var u=0;Object.keys(it).forEach(function(i){if((it[i].t||0)>u){u=it[i].t;por=it[i].por}})}
   return{o:o,nic:x.nic||a.nic||'',tec:x.tec||a.tec||'',fecha:x.fecha||a.fecha||'',ana:por||'',est:est(o),res:k.fin?k.fin.res:'',t:k.fin?k.fin.t:k.t,
-   items:it,nc:ITEMS.filter(function(t){return(it[t[0]]||{}).e==='NC'}).map(function(t){return t[1]}),obs:k.obs||'',ser:k.serial?k.serial.res:''}})
+   lib:k.lib?(k.lib.por||'')+' · '+fechaCorta(k.lib.t):'',re:M[o]?reNic(M[o]):'',items:it,nc:ITEMS.filter(function(t){return(it[t[0]]||{}).e==='NC'}).map(function(t){return t[1]}),obs:k.obs||'',ser:k.serial?k.serial.res:''}})
   .sort(function(a,b){return(b.t||0)-(a.t||0)})}
 function rvFiltradas(L){var h=new Date(),hoy=dk(h);h.setDate(h.getDate()-1);var ayer=dk(h),q=RVF.q.toLowerCase();
  return L.filter(function(r){var d=r.t?dk(new Date(r.t)):'';if(RVF.dia==='hoy'&&d!==hoy)return false;if(RVF.dia==='ayer'&&d!==ayer)return false;
-  if(RVF.fe&&d!==RVF.fe.replace(/-/g,''))return false;if(RVF.ana&&r.ana!==RVF.ana)return false;if(RVF.tec&&r.tec!==RVF.tec)return false;if(RVF.est&&r.est!==RVF.est)return false;
+  if(RVF.fe&&d!==RVF.fe.replace(/-/g,''))return false;if(RVF.ana&&r.ana!==RVF.ana)return false;if(RVF.tec&&r.tec!==RVF.tec)return false;if(RVF.est==='LIB'?!/^LIBERADA/.test(r.est):RVF.est&&r.est!==RVF.est)return false;
   if(q&&(r.o+' '+r.nic+' '+r.tec+' '+r.ana).toLowerCase().indexOf(q)<0)return false;return true})}
 var EC={C:'✓',NC:'✗',NA:'N/A'},EX={C:'CONFORME',NC:'NO CONFORME',NA:'NO APLICA'};
-function rvPintar(){var L=rvFiltradas(rvFilas()),A=rvFilas(),an={},te={},c={'':A.length,'EN REVISIÓN':0,FINALIZADA:0};
- A.forEach(function(r){if(r.ana)an[r.ana]=1;if(r.tec)te[r.tec]=1;c[r.est]=(c[r.est]||0)+1});
+function rvPintar(){var L=rvFiltradas(rvFilas()),A=rvFilas(),an={},te={},c={'':A.length,'EN REVISIÓN':0,FINALIZADA:0,LIB:0,'LIBERADA PENDIENTE':0};
+ A.forEach(function(r){if(r.ana)an[r.ana]=1;if(r.tec)te[r.tec]=1;c[r.est]=(c[r.est]||0)+1;if(/^LIBERADA/.test(r.est))c.LIB++});
  $('rvAna').innerHTML='<option value="">Analista: todos</option>'+Object.keys(an).sort().map(function(a){return'<option'+(a===RVF.ana?' selected':'')+'>'+esc(a)+'</option>'}).join('');
  $('rvTec').innerHTML='<option value="">Técnico: todos</option>'+Object.keys(te).sort().map(function(a){return'<option'+(a===RVF.tec?' selected':'')+'>'+esc(a)+'</option>'}).join('');
- $('rvEst').innerHTML=[['','Todas'],['EN REVISIÓN','En revisión'],['FINALIZADA','Finalizadas']].map(function(e){return'<button type="button" data-v="'+e[0]+'" class="'+(RVF.est===e[0]?'on':'')+'">'+e[1]+' <b>'+(c[e[0]]||0)+'</b></button>'}).join('');
+ $('rvEst').innerHTML=[['','Todas'],['EN REVISIÓN','En revisión'],['FINALIZADA','Finalizadas'],['LIB','🔵 Liberadas'],['LIBERADA PENDIENTE','Liberada pendiente']].map(function(e){return'<button type="button" data-v="'+e[0]+'" class="'+(RVF.est===e[0]?'on':'')+(e[0]==='LIB'||e[0]==='LIBERADA PENDIENTE'?' lbs':'')+'">'+e[1]+' <b>'+(c[e[0]]||0)+'</b></button>'}).join('');
  $('rvInfo').textContent=L.length+' de '+A.length+' órdenes revisadas';
- $('rvT').innerHTML='<thead><tr><th>Orden</th><th>NIC</th><th>Técnico</th><th>Fecha visita</th><th>Analista</th><th>Revisada</th><th>Estado</th><th>Resultado</th>'+
+ $('rvT').innerHTML='<thead><tr><th>Orden</th><th>NIC</th><th>Técnico</th><th>Fecha visita</th><th>Analista</th><th>Revisada</th><th>Estado</th><th>Resultado</th><th>Liberada</th>'+
   ITEMS.map(function(t){return'<th class="rvi" title="'+esc(t[1])+'">'+esc(t[1])+'</th>'}).join('')+'<th>No conformes</th><th>Serial</th><th>Observaciones</th></tr></thead><tbody>'+
-  (L.slice(0,1500).map(function(r){return'<tr data-o="'+esc(r.o)+'"><td><b>'+esc(r.o)+'</b></td><td>'+esc(r.nic)+'</td><td>'+esc(r.tec)+'</td><td>'+esc(String(r.fecha).slice(0,10))+'</td><td>'+esc(r.ana)+'</td><td>'+esc(r.t?fechaCorta(r.t):'')+'</td>'+
-   '<td><span class="ke '+(r.est==='FINALIZADA'?'ok':'wn')+'">'+r.est+'</span></td><td>'+esc(r.res)+'</td>'+
+  (L.slice(0,1500).map(function(r){return'<tr data-o="'+esc(r.o)+'"'+(/^LIBERADA/.test(r.est)?' class="lib"':'')+'><td><b>'+esc(r.o)+'</b></td><td>'+esc(r.nic)+'</td><td>'+esc(r.tec)+'</td><td>'+esc(String(r.fecha).slice(0,10))+'</td><td>'+esc(r.ana)+'</td><td>'+esc(r.t?fechaCorta(r.t):'')+'</td>'+
+   '<td><span class="ke '+ecl(r.est)+'">'+r.est+'</span></td><td>'+esc(r.res)+'</td><td>'+esc(r.re?'reemplaza a '+r.re:r.lib)+'</td>'+
    ITEMS.map(function(t){var e=(r.items[t[0]]||{}).e||'';return'<td class="rve '+(e==='C'?'c':e==='NC'?'nc':e==='NA'?'na':'')+'">'+(EC[e]||'')+'</td>'}).join('')+
-   '<td class="rvnc">'+esc(r.nc.join(', '))+'</td><td>'+esc(r.ser)+'</td><td class="rvob">'+esc(r.obs)+'</td></tr>'}).join('')||'<tr><td colspan="'+(11+ITEMS.length)+'" class="mu" style="padding:14px">No hay revisiones con estos filtros.</td></tr>')+'</tbody>'}
+   '<td class="rvnc">'+esc(r.nc.join(', '))+'</td><td>'+esc(r.ser)+'</td><td class="rvob">'+esc(r.obs)+'</td></tr>'}).join('')||'<tr><td colspan="'+(12+ITEMS.length)+'" class="mu" style="padding:14px">No hay revisiones con estos filtros.</td></tr>')+'</tbody>'}
 window.revMostrar=function(){if(!ORD.length&&window.kDatos)window.kDatos();rvPintar();bajarTodo().then(rvPintar);cargarCfg()};
 $('rvT').onclick=function(e){var tr=e.target.closest('tr[data-o]');if(!tr)return;X.ir('chk');window.kAbrir(tr.getAttribute('data-o'))};
 $('rvDia').onclick=function(e){var b=e.target.closest('button');if(!b)return;RVF.dia=b.dataset.v;[].forEach.call(this.children,function(x){x.classList.toggle('on',x===b)});rvPintar()};
@@ -600,9 +638,9 @@ $('rvEst').onclick=function(e){var b=e.target.closest('button');if(!b)return;RVF
 $('rvFe').onchange=function(){RVF.fe=this.value;rvPintar()};$('rvAna').onchange=function(){RVF.ana=this.value;rvPintar()};$('rvTec').onchange=function(){RVF.tec=this.value;rvPintar()};
 var tq2;$('rvQ').oninput=function(){var v=this.value;clearTimeout(tq2);tq2=setTimeout(function(){RVF.q=v.trim();rvPintar()},180)};
 $('rvXls').onclick=function(){if(typeof XLSX==='undefined'){toast('No cargó la librería de Excel.',true);return}var L=rvFiltradas(rvFilas());if(!L.length){toast('No hay filas para exportar.',true);return}
- var H=['Orden','NIC','Técnico','Fecha visita','Analista','Revisada','Estado','Resultado'].concat(ITEMS.map(function(t){return t[1]}),['No conformes','Serial','Observaciones']);
- var A=[H].concat(L.map(function(r){return[r.o,r.nic,r.tec,r.fecha,r.ana,r.t?fechaCorta(r.t):'',r.est,r.res].concat(ITEMS.map(function(t){return EX[(r.items[t[0]]||{}).e]||''}),[r.nc.join(', '),r.ser,r.obs])}));
- var ws=XLSX.utils.aoa_to_sheet(A);ws['!cols']=H.map(function(h,i){return{wch:i<8?14:i>=H.length-3?40:12}});var wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Revisiones');
+ var H=['Orden','NIC','Técnico','Fecha visita','Analista','Revisada','Estado','Resultado','Liberada'].concat(ITEMS.map(function(t){return t[1]}),['No conformes','Serial','Observaciones']);
+ var A=[H].concat(L.map(function(r){return[r.o,r.nic,r.tec,r.fecha,r.ana,r.t?fechaCorta(r.t):'',r.est,r.res,r.re?'reemplaza a '+r.re:r.lib].concat(ITEMS.map(function(t){return EX[(r.items[t[0]]||{}).e]||''}),[r.nc.join(', '),r.ser,r.obs])}));
+ var ws=XLSX.utils.aoa_to_sheet(A);ws['!cols']=H.map(function(h,i){return{wch:i<9?14:i>=H.length-3?40:12}});var wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Revisiones');
  XLSX.writeFile(wb,'revisiones_'+dk(new Date())+'.xlsx')};
 
 /* ---------- eventos ---------- */
@@ -611,7 +649,7 @@ $('kDet').onclick=async function(e){var t=e.target;
  var f=t.closest('.kth');if(f){lbAbrir(+f.getAttribute('data-f'));return}
  var ir=t.closest('[data-ir]');if(ir){lbAbrir(+ir.getAttribute('data-ir'));return}
  if(t.closest('.kits')&&clicItems(e,false))return;
- if(t.id==='kFin')finalizar();else if(t.id==='kReab')reabrir();
+ if(t.id==='kFin')finalizar();else if(t.id==='kLibe')liberar();else if(t.id==='kDesLib')quitarLib();else if(t.id==='kReab')reabrir();
  else if(t.id==='kLib')liberarAdmin();
  else if(t.id==='kReSub'){encolarSubida(CUR.o);pintarCab()}
  else if(t.id==='kSer1'){var o=CUR.o;t.disabled=true;t.textContent='Verificando…';delete kk(o).serial;try{await verificarSerial(o)}catch(x){toast('No se pudo verificar: '+((x&&x.message)||''),true)}VER_EN='';if(CUR&&CUR.o===o)pintar();lista()}
@@ -623,8 +661,6 @@ document.addEventListener('keydown',function(e){
  var kx=e.key.toLowerCase();
  if(e.key==='Escape')lbCerrar();else if(e.key==='ArrowRight')lbIr(LBI+1);else if(e.key==='ArrowLeft')lbIr(LBI-1);
  else if(kx==='r')girar(90);else if(e.key==='+')zCentro(1.4);else if(e.key==='-')zCentro(1/1.4);
- else if(kx==='c'||kx==='n'||kx==='a'){if(!puedo())return;var it=itemDe(LBI);if(!it){toast('Primero toca a qué ítem pertenece esta foto.');return}
-  var k=kk(CUR.o);k.items=k.items||{};var m=k.items[it]||(k.items[it]={}),v=kx==='c'?'C':kx==='n'?'NC':'NA';m.e=v;sello(m);guardar();lbPanel()}
  else return;e.preventDefault()});
 function seg(id,key){$(id).onclick=function(e){var b=e.target.closest('button');if(!b)return;FILT[key]=b.getAttribute('data-v');if(id==='kDia')[].forEach.call(this.children,function(x){x.classList.toggle('on',x===b)});lista()}}
 seg('kDia','dia');seg('kEst','est');seg('kSer','ser');seg('kAsig','asig');

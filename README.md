@@ -73,6 +73,14 @@ Archivos: `index.html` (página), `config.js` (URL del puente), `gh.js` (conexi�
 - Bloqueo: la orden abierta queda a nombre del analista. Los demás la ven en solo lectura con 🔒. Se suelta al cambiar de orden, al finalizar o tras 10 minutos sin actividad. El admin la libera con su clave.
 - Pestaña **Revisiones**: tabla de lo revisado, con una columna por ítem del checklist, filtros y botón para exportar a Excel.
 
+## Liberadas
+- En Validar IA, el botón **🔵 Liberada** (al lado de Finalizar) marca una orden que quedó mal y se vuelve a hacer. Queda en azul y siempre pendiente.
+- Las que el py detecta como liberadas (Resultado o Estado orden = LIBERADA) también quedan así.
+- **LIBERADA PENDIENTE** sale cuando vuelve a aparecer:
+  - la misma OS con otra fecha de visita: la revisión empieza de cero, lo anterior se guarda aparte y las fotos viejas de Drive se renombran "(antes de liberar …)";
+  - el mismo NIC en otra OS.
+- En Resultado hay una columna **Estado** de primera y las liberadas salen en azul claro. En Revisiones están los apartados Liberadas y Liberada pendiente.
+
 ## Actualizar
 1. Sube a GitHub los archivos que cambiaron (index.html, gh.js, gh.css, chk.js, chk.css, README.md). **No subas config.js**, porque ahí está tu URL.
 2. Pega `apps-script/Codigo.gs` en el Apps Script y guarda. Luego ve a Implementar → Gestionar implementaciones → lápiz → Versión: **Nueva versión** → Implementar. La URL no cambia.

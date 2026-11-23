@@ -5,13 +5,11 @@ var $=X.$,esc=X.esc,toast=X.toast,drMsg=X.drMsg,drLista=X.drLista,drBytes=X.drBy
 
 /* ---------- plantilla de la pestaña ---------- */
 var COLS=[ /* [clave en el Excel, título corto, clase, ancho relativo, título completo] — orden de la plantilla VOF CAMP */
- ['_pdf','PDF','pdf',2.3],['Hora','Hora','nw',4.4],['Orden','Orden','st3',5.6],['NIC','NIC','nw',4.6],['Técnico','Técnico','a',7.6],['Proceso','Proceso','nw',4.6],['Tipo Orden','Tipo orden','nw',4.2],
- ['IRREGULARIDAD','Irregularidad','a',7.4],['TIPO DE IRRE','Tipo de irre','w',7.6],['OBSERVACION IRREGULARIDAD','Observación irreg.','w',8,'Observación irregularidad'],
- ['CONEXIONES','Conex.','',2.6,'Conexiones'],['PRUEBAS PUENTES','Puentes','',2.6,'Pruebas puentes'],['CONTINUIDAD','Contin.','',2.6,'Continuidad'],['DISPLAY','Display','',2.6],
- ['ESTADO DEL INTEGRADOR','Integr.','',2.6,'Estado del integrador'],['GIRO NORMAL','Giro','',2.6,'Giro normal'],['HAY ROZAMIENTO','Rozam.','',2.8,'Hay rozamiento'],['MEDIDOR SE FRENA','Frena','',2.6,'Medidor se frena'],
+ ['_est','Estado','est',5.6,'Estado en Validar IA'],['_pdf','PDF','pdf',2.3],['Hora','Hora','nw',4.4],['Orden','Orden','st3',5.6],['NIC','NIC','nw',4.6],['Técnico','Técnico','a',7.6],['Proceso','Proceso','nw',4.6],['Tipo Orden','Tipo orden','nw',4.2],
+ ['IRREGULARIDAD','Irregularidad','a',8.4],['TIPO DE IRRE','Tipo de irre','w',9],
  ['APLICA PARE','PARE','',2.8,'Aplica PARE'],['SE NECESITA VIDEO','Nec. video','',2.8,'Se necesita video'],['LO SUBIÓ AL APLICATIVO','Subió video','',2.8,'Lo subió al aplicativo'],['APOYO CARRO CANASTA','Canasta','',3,'Apoyo carro canasta'],
- ['NOVEDAD IRREGULARIDAD','Novedad irreg.','w',6,'Novedad irregularidad'],['Resultado','Resultado','',5],['Cobro mal','Cobro mal','',3.2],
- ['Mano de obra cobrada mal','M. obra cobrada mal','w',6.2,'Mano de obra cobrada mal'],['Materiales cobrados mal','Materiales cobrados mal','w',6.2],['Detalle','Detalle','w',6.4],
+ ['NOVEDAD IRREGULARIDAD','Novedad irreg.','w',7,'Novedad irregularidad'],['Resultado','Resultado','',5],['Cobro mal','Cobro mal','',3.2],
+ ['Mano de obra cobrada mal','M. obra cobrada mal','w',6.2,'Mano de obra cobrada mal'],['Materiales cobrados mal','Materiales cobrados mal','w',6.2],['Detalle','Detalle','w',7.4],
  ['_alertas','Alertas','',5.2],['_crit','Criterio','',3.8]];
 var ANCHO=COLS.reduce(function(a,c){return a+c[3]},0);
 $('tRes').innerHTML=
@@ -141,12 +139,15 @@ function rPintar(){
   return'<div data-p="'+esc(p)+'" style="cursor:pointer'+(rFil.pro===p?';color:var(--ac)':'')+'"><div class="row"><b>'+esc(p==='CAMPANA'?'CAMPAÑA':p)+'</b><span>'+rNum(x.n)+' órdenes · <span style="color:var(--er)">'+(x.cm||0)+' cobro mal</span></span></div><div class="stk">'+
    cats.map(function(c){return x[c]?'<i style="width:'+(x[c]*100/x.n)+'%;background:'+R_COL[c]+'" title="'+c+': '+x[c]+'"></i>':''}).join('')+'</div><div class="row mu" style="margin-top:3px"><span>'+rPct(x['CUMPLE']||0,x.n)+' cumple</span><span>'+(x['NO CUMPLE']||0)+' no cumple · '+(x['REVISAR']||0)+' revisar</span></div></div>'}).join('')+'</div>';
  rTabla();cfPintar()}
+function estDe(r){var o=rv(r,'Orden'),e=window.kEstado?window.kEstado(o):'';if(!e&&pyLib(r))e='LIBERADA';return e}
+function pyLib(r){return rv(r,'Resultado')==='LIBERADA'||rv(r,'IRREGULARIDAD')==='LIBERADA'||/LIBERAD/i.test(rv(r,'Estado orden'))}
 function valor(r,c){
+ if(c==='_est')return estDe(r);
  if(c==='Hora')return rv(r,'Hora');
  if(c==='Fecha')return r._fk;
  if(c==='Orden'||c==='NIC'){var n=parseFloat(rv(r,c));return isNaN(n)?rv(r,c):n}
  return rv(r,c)}
-function cfVal(r,k){if(k==='_alertas')return r._tags.map(function(t){return t[1]});if(k==='_crit')return r._crit.split(' ').filter(Boolean);return[rv(r,k)]}
+function cfVal(r,k){if(k==='_est')return[estDe(r)];if(k==='_alertas')return r._tags.map(function(t){return t[1]});if(k==='_crit')return r._crit.split(' ').filter(Boolean);return[rv(r,k)]}
 function cfPasa(r,salta){for(var k in CF){var f=CF[k];if(!f||k===salta)continue;var vs=cfVal(r,k);
   if(f.t==='s'){if(f.v==='(vacío)'?vs.some(function(x){return x}):vs.indexOf(f.v)<0)return false}
   else{var q=f.v.toLowerCase();if(!vs.some(function(x){return x.toLowerCase().indexOf(q)>=0}))return false}}return true}
@@ -178,7 +179,9 @@ function rTabla(){
  $('rTh').innerHTML=COLS.map(function(c){var s=c[0]!=='_pdf',on=rOrd.c===c[0];
   return'<th class="'+c[2]+(s?' so':'')+(on?' on':'')+'"'+(s?' data-c="'+esc(c[0])+'" tabindex="0" title="Ordenar por '+esc(c[4]||c[1])+'"':'')+'>'+esc(c[1])+(on?(rOrd.d<0?' ▼':' ▲'):'')+'</th>'}).join('');
  $('rTb').innerHTML=l.slice(0,rLimN).map(function(r){var s=rv(r,'Resultado'),o=rv(r,'Orden');
-  return'<tr data-o="'+esc(o)+'"'+(s==='LIBERADA'||rv(r,'Estado orden')?' class="lib"':'')+' tabindex="0">'+COLS.map(function(c){var k=c[0],v;
+  var es=estDe(r);
+  return'<tr data-o="'+esc(o)+'"'+(/^LIBERADA/.test(es)||pyLib(r)?' class="lib"':'')+' tabindex="0">'+COLS.map(function(c){var k=c[0],v;
+   if(k==='_est')return'<td class="est">'+(es?'<span class="pl '+(es==='FINALIZADA'?'OK':es==='EN REVISIÓN'?'A':/^LIBERADA/.test(es)?'B':'P')+'">'+esc(es)+'</span>':'')+'</td>';
    if(k==='_pdf'){var u=PDFS[o];return'<td class="pdf">'+(u?'<a class="pdfb" href="'+esc(u)+'" target="_blank" rel="noopener" title="Abrir el acta '+esc(o)+'.pdf en Drive (desde ahí se descarga)">PDF</a>':'<span class="pdfb no" title="'+(pdfBusy?'Buscando las actas en Drive…':'No hay acta de esta orden en VOF CAMP/ORDENES')+'">PDF</span>')+'</td>'}
    if(k==='_alertas')return'<td'+(r._tags.length?' data-tip="'+esc(r._tags.map(function(t){return t[1]}).join(' | '))+'"':'')+'>'+r._tags.map(function(t){return'<span class="tg '+t[0]+'">'+t[1]+'</span>'}).join('')+'</td>';
    if(k==='_crit')return'<td'+(r._crit?' data-tip="'+esc(r._crit.split(' ').map(function(c){var t=(RS.crit.filter(function(x){return x.c===c})[0]||{}).t;return c+(t?' — '+t:'')}).join(' | '))+'"':'')+'>'+r._crit.split(' ').filter(Boolean).map(function(x){return'<span class="tg '+(x[0]==='C'||x[0]==='T'?'er':'wn')+'">'+x+'</span>'}).join('')+'</td>';
@@ -285,7 +288,7 @@ $('rTb').onclick=function(e){if(e.target.closest('a'))return;var t=e.target.clos
 $('rTb').onkeydown=function(e){if(e.key==='Enter'&&!e.target.closest('a')){var t=e.target.closest('tr[data-o]');if(t)rAbrir(t.getAttribute('data-o'))}};
 document.addEventListener('drop',function(ev){if(X.tab()!=='res')return;var f=[].filter.call(ev.dataTransfer.files||[],function(x){return /\.xlsx$/i.test(x.name)})[0];if(f){ev.stopImmediatePropagation();rArchivo(f)}},true);
 
-window.rPintar=function(){rPintar();setTimeout(rAlto,30)};window.rIniciar=rIniciar;window.rFilas=function(){return RS.A||[]};window.rTecDe=function(o){return RS.TEC&&RS.TEC[o]||''};window.rTotTec=function(){return RS.TOT||{}};window.rTiene=function(){return RS.A.length>0};
+window.rPintar=function(){rPintar();setTimeout(rAlto,30)};window.rIniciar=rIniciar;window.rFilas=function(){return RS.A||[]};window.rTecDe=function(o){return RS.TEC&&RS.TEC[o]||''};window.rTotTec=function(){return RS.TOT||{}};window.rRefrescar=function(){if(RS.A.length&&!$('tRes').hidden){cfPintar();rTabla()}};window.rTiene=function(){return RS.A.length>0};
 if(X.listo)rIniciar();
 setTimeout(function(){if(!X.listo&&!RS.A.length)$('rInfo').textContent='Google Drive no está conectado en esta vista: abre el Excel de resultado desde el computador.'},10000);
 })();

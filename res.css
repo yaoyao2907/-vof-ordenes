@@ -39,7 +39,7 @@
 #tRes .rt td.w{white-space:normal;min-width:260px;max-width:460px;font-size:11px;color:var(--mu)}
 #tRes .rt tbody tr{cursor:pointer}
 #tRes .rt tbody tr:hover td{background:color-mix(in srgb,var(--ac) 9%,var(--card))}
-#tRes .rt tr.lib td{background:color-mix(in srgb,var(--pu) 16%,var(--card))}
+#tRes .rt tr.lib td{background:color-mix(in srgb,#3a9ad9 20%,var(--card))}
 #tRes .tg{display:inline-block;padding:0 6px;margin:0 3px 2px 0;border-radius:99px;font-size:10px;font-weight:700;letter-spacing:.04em;border:1px solid currentColor}
 #tRes .tg.er{color:var(--er)}#tRes .tg.wn{color:var(--wn)}#tRes .tg.pu{color:var(--pu)}#tRes .tg.ok{color:var(--ok)}#tRes .tg.ac{color:var(--ac)}
 #tRes .pl.OK{background:color-mix(in srgb,var(--ok) 22%,var(--card));color:var(--ok)}
@@ -132,3 +132,7 @@ main:has(>#tRes:not([hidden])){padding-bottom:10px!important}
 #tRes .rt tr.tf select{-webkit-appearance:none;appearance:none;padding:2px 3px;cursor:pointer;text-overflow:ellipsis}
 #tRes .rt tr.tf th{box-shadow:0 1px 0 var(--ln),0 -2px 0 var(--nv)}
 #tRes .rt thead tr:first-child th{box-shadow:0 2px 0 var(--nv)}
+
+#tRes .pl.B{background:color-mix(in srgb,#3a9ad9 25%,var(--card));color:#2f8fd0}
+#tRes .pl.P{background:transparent;color:var(--mu);border:1px solid var(--ln)}
+#tRes .rt td.est .pl{white-space:normal;line-height:1.15}
