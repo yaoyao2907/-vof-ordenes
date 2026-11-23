@@ -164,7 +164,7 @@
 #tChk .klba{position:relative}
 
 /* fila del resultado debajo del técnico */
-#tChk .krf{overflow-x:auto;border:1px solid var(--ln);border-radius:6px;margin:6px 0 8px;background:var(--card)}
+#tChk .krf{flex:none;overflow-x:auto;border:1px solid var(--ln);border-radius:6px;margin:6px 0 8px;background:var(--card)}
 #tChk .krf table{border-collapse:collapse;width:100%;font-size:11.5px;min-width:820px}
 #tChk .krf th{background:color-mix(in srgb,var(--ok) 14%,var(--card));color:var(--ok);font-weight:700;text-align:left;padding:6px 7px;border-bottom:1px solid var(--ln);vertical-align:bottom;font-size:10.5px}
 #tChk .krf td{padding:6px 7px;vertical-align:top;color:var(--tx);max-width:190px}
@@ -197,3 +197,4 @@
 #tLib .ke{font-size:10px;font-weight:800;padding:1px 6px;border-radius:3px;border:1px solid var(--ln)}#tLib .ke.ok{color:var(--ok);border-color:var(--ok)}#tLib .ke.wn{color:var(--wn);border-color:var(--wn)}
 #tLib .rvt tr.lib td{background:color-mix(in srgb,#3a9ad9 16%,var(--card))}
 #tLib .kseg button.lbs:not(.on){color:#2f8fd0}#tLib .kseg button.lbs.on{background:#3a9ad9;color:#fff}
+#tChk .krf .kcl{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
