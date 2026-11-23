@@ -335,7 +335,7 @@ function serialHtml(){var k=K[CUR.o]||{},a=k.acta||{},s=k.serial;
  t+='<button type="button" class="b s" id="kSer1">'+(s?'Volver a verificar':'Verificar serial')+'</button></div>';return t}
 function itemDe(i){return(((K[CUR.o]||{}).fotos||{})[i]||{}).item||''}
 function rotDe(i){return(((K[CUR.o]||{}).fotos||{})[i]||{}).rot||0}
-function chip(i){var it=itemDe(i);if(!it)return'<span class="kchip nada">Sin ítem</span>';var e=(((K[CUR.o]||{}).items||{})[it]||{}).e;
+function chip(i){return'';var it=itemDe(i);if(!it)return'<span class="kchip nada">Sin ítem</span>';var e=(((K[CUR.o]||{}).items||{})[it]||{}).e;
  return'<span class="kchip '+(e==='NC'?'nc':e==='C'?'c':e==='NA'?'na':'')+'">'+esc(TN[it]||it)+(e?' · '+(e==='C'?'✓':e==='NC'?'✗':'N/A'):'')+'</span>'}
 
 /* lista de los 14 ítems (sirve en el visor y en el resumen) */
@@ -373,13 +373,13 @@ function pintar(){
 /* clics en la lista de ítems (visor o resumen) */
 function clicItems(e,lb){var t=e.target.closest('button');if(!t)return false;
  if((t.dataset.it&&lb)||t.dataset.ie){if(!puedo())return true}
- if(t.dataset.it){var id=t.dataset.it;
+ if(false){var id=t.dataset.it;
   if(lb){var k=kk(CUR.o),m=k.fotos[LBI]||(k.fotos[LBI]={});m.item=m.item===id?'':id;sello(m);guardar();lbPanel();pintarMini()}
   else{var fs=fotosDeItem(id);if(fs.length)lbAbrir(fs[0]);else toast('Ninguna foto está marcada como "'+TN[id]+'". Abre una foto y toca el ítem.')}
   return true}
  if(t.dataset.ie){var id2=t.dataset.id,k2=kk(CUR.o);k2.items=k2.items||{};var m2=k2.items[id2]||(k2.items[id2]={});
   m2.e=m2.e===t.dataset.ie?'':t.dataset.ie;sello(m2);
-  if(lb&&m2.e){var mf=k2.fotos[LBI]||(k2.fotos[LBI]={});mf.item=id2;sello(mf)}            /* la foto en la que estás queda de ese ítem */
+  if(false){var mf=k2.fotos[LBI]||(k2.fotos[LBI]={});mf.item=id2;sello(mf)}            /* la foto en la que estás queda de ese ítem */
   guardar();if(lb)lbPanel();else pintar();return true}
  return false}
 function inputObs(e){if(!e.target.dataset||!e.target.dataset.obsg||CUR.ro)return;var k=kk(CUR.o);k.obs=e.target.value;k.ana=ana();k.t=Date.now();guardarLocal();subir(CUR.o);
