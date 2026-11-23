@@ -246,7 +246,7 @@ textarea{font:inherit;color:var(--tx);background:var(--bg);border:1px solid var(
     <button class="b s" data-r="er" type="button">Sin cambiar / error</button>
     <button class="b s" data-r="" type="button">Todos</button>
    </span>
-   <select id="hDia" aria-label="Día del cambio"><option value="">Día: todos</option></select>
+   <select id="hDia" aria-label="Día del cambio"><option value="">Día: todos</option></select><span class="fdr"><label>Desde <input type="date" id="hDes"></label><label>Hasta <input type="date" id="hHas"></label></span>
    <select id="hTec" aria-label="Técnico"><option value="">Técnico: todos</option></select>
    <input type="search" id="hq" placeholder="Buscar orden, técnico, código o mano de obra">
   </div>
@@ -1172,10 +1172,11 @@ function hPintar(){
  var q=nrm($('hq').value),dia=$('hDia').value,tecF=$('hTec').value;
  HC.forEach(function(r){r._tec=hTecDe(r)});
  /* lista de técnicos */
- var tl={};HC.forEach(function(r){if((!hRes||r.t===hRes)&&(!dia||r.fecha.slice(0,10)===dia))tl[r._tec]=(tl[r._tec]||0)+1});
+ var tl={};var hde=$('hDes').value,hha=$('hHas').value,hR=function(r){var f=r.fecha.slice(0,10);return(!hde||f>=hde)&&(!hha||f<=hha)};
+ HC.forEach(function(r){if((!hRes||r.t===hRes)&&(!dia||r.fecha.slice(0,10)===dia)&&hR(r))tl[r._tec]=(tl[r._tec]||0)+1});
  if(tecF&&!tl[tecF])tl[tecF]=0;
  $('hTec').innerHTML='<option value="">Técnico: todos</option>'+Object.keys(tl).sort().map(function(t){return'<option value="'+esc(t)+'"'+(t===tecF?' selected':'')+'>'+esc(t)+' ('+tl[t]+')</option>'}).join('');
- var base=HC.filter(function(r){if(hRes&&r.t!==hRes)return false;if(dia&&r.fecha.slice(0,10)!==dia)return false;if(q&&nrm([r.orden,r._tec,r.cod,r.mo,r.estado].join(' ')).indexOf(q)<0)return false;return true});
+ var base=HC.filter(function(r){if(hRes&&r.t!==hRes)return false;if(dia&&r.fecha.slice(0,10)!==dia)return false;if(!hR(r))return false;if(q&&nrm([r.orden,r._tec,r.cod,r.mo,r.estado].join(' ')).indexOf(q)<0)return false;return true});
  /* cada cobro mal se cuenta una vez (orden + código), aunque se haya intentado varias veces */
  var uno={};base.forEach(function(r){var k=r.orden+'|'+r.cod;if(!uno[k]||r.fecha>uno[k].fecha)uno[k]=r});var U=Object.keys(uno).map(function(k){return uno[k]});
  var esMat=function(r){return /^\[MATERIAL/i.test(r.mo)};
@@ -1220,7 +1221,7 @@ async function hCargar(manual){
 $('hDrv').onclick=function(){hCargar(true)};
 $('hDir').onclick=function(){$('fd').click()};
 $('hRes').onclick=function(e){var b=e.target.closest('button');if(!b)return;hRes=b.getAttribute('data-r');[].forEach.call(this.children,function(x){x.classList.toggle('on',x===b)});hPintar()};
-$('hDia').onchange=hPintar;$('hTec').onchange=hPintar;
+$('hDia').onchange=hPintar;$('hDes').onchange=$('hHas').onchange=hPintar;$('hTec').onchange=hPintar;
 $('hPh').onclick=function(e){var t=e.target.closest('th[data-c]');if(!t)return;var c=t.getAttribute('data-c');if(hOrdP.c===c)hOrdP.d=-hOrdP.d;else{hOrdP.c=c;hOrdP.d=c==='t'?1:-1}hPintar()};
 $('hPt').onclick=function(e){var t=e.target.closest('tr[data-t]');if(!t)return;var k=t.getAttribute('data-t');$('hTec').value=$('hTec').value===k?'':k;if($('hTec').value!==k&&$('hTec').value!=='')$('hTec').value='';hPintar()};var hqt;$('hq').oninput=function(){clearTimeout(hqt);hqt=setTimeout(hPintar,180)};
 window.VOFX={sample:function(){return SAMPLE},pdfLines:pdfLines,parseActa:parseActa,nrm:nrm,db:function(){return dbOk?DBX:null},$:$,esc:esc,toast:toast,drMsg:drMsg,drLista:drLista,drBytes:drBytes,DR:DR,ir:function(t){ir(t)},mcp:function(){return MCP},tab:function(){return TAB}};

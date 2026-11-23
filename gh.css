@@ -22,3 +22,9 @@
 #ghBar .ghsal{margin-left:auto;border-color:var(--mu,#999);color:var(--mu,#777)}
 #ghCfg .ghadm{max-width:320px}#ghCfg .ghmsg{margin:0;font-weight:700}
 body{align-content:start}
+
+/* filtro de fechas Desde / Hasta (todas las pestañas) */
+.fdr{display:inline-flex;gap:6px;align-items:center;flex-wrap:wrap}
+.fdr label{display:inline-flex;gap:4px;align-items:center;font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--mu)}
+.fdr input[type=date]{font:inherit;font-size:12px;text-transform:none;letter-spacing:0;background:var(--bg);color:var(--tx);border:1px solid var(--ln);border-radius:5px;padding:5px 6px;min-width:0}
+.fdr input[type=date]:focus{outline:0;border-color:var(--ac)}

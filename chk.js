@@ -26,7 +26,7 @@ sec.innerHTML=
  '<div class="khd"><b>Validar IA · revisión de la orden</b><span class="mu" id="kInfo">Carga el resultado para ver las órdenes.</span><span style="flex:1"></span>'+
  '<label class="kan">Analista <select id="kAna"><option value="">— escoge —</option></select></label>'+
  '<button class="b s" id="kPdf" type="button">Abrir PDF del computador</button><input type="file" id="kFi" accept=".pdf" hidden></div>'+
- '<div class="kf"><div class="kseg" id="kDia"><button type="button" data-v="hoy">Hoy</button><button type="button" data-v="ayer">Ayer</button><button type="button" data-v="" class="on">Todos</button></div>'+
+ '<div class="kf"><div class="kseg" id="kDia"><button type="button" data-v="hoy">Hoy</button><button type="button" data-v="ayer">Ayer</button><button type="button" data-v="" class="on">Todos</button></div>'+'<span class="fdr"><label>Desde <input type="date" id="kDes"></label><label>Hasta <input type="date" id="kHas"></label></span>'+
  '<div class="kseg" id="kEst"></div>'+
  '<select id="kTec" aria-label="Técnico"><option value="">Técnico: todos</option></select>'+
  '<select id="kMo" aria-label="Mano de obra"><option value="">Mano de obra: todas</option></select>'+
@@ -111,7 +111,8 @@ window.kDatos=function(){
  $('kInfo').textContent=ORD.length?ORD.length+' órdenes con acta en el resultado.':'El resultado no trae órdenes con acta.';
  lista()};
 function base(sinEst,sinSer,sinAsig){var mt=misTecs();var h=new Date(),hoy=dk(h);h.setDate(h.getDate()-1);var ayer=dk(h),q=FILT.q.toLowerCase();
- return ORD.filter(function(x){if(FILT.dia==='hoy'&&x.k!==hoy)return false;if(FILT.dia==='ayer'&&x.k!==ayer)return false;
+ var de=($('kDes').value||'').replace(/-/g,''),ha=($('kHas').value||'').replace(/-/g,'');
+ return ORD.filter(function(x){if(FILT.dia==='hoy'&&x.k!==hoy)return false;if(FILT.dia==='ayer'&&x.k!==ayer)return false;if(de&&(!x.k||x.k<de))return false;if(ha&&(!x.k||x.k>ha))return false;
   if(FILT.tec&&x.tec!==FILT.tec)return false;if(FILT.mo&&x.mo.indexOf(FILT.mo)<0)return false;
   if(q&&(x.o+' '+x.nic+' '+x.tec).toLowerCase().indexOf(q)<0)return false;
   if(!sinAsig&&FILT.asig==='mios'&&mt&&mt.indexOf(x.tec)<0)return false;
@@ -602,10 +603,10 @@ montarCfg();
 var rsec=document.createElement('section');rsec.id='tRev';rsec.hidden=true;var rref=$('tCri');rref.parentNode.insertBefore(rsec,rref);
 rsec.innerHTML='<div class="khd"><b>Revisiones</b><span class="mu" id="rvInfo"></span><span style="flex:1"></span><button class="b s" id="rvXls" type="button">Exportar a Excel</button></div>'+
  '<div class="kf"><div class="kseg" id="rvDia"><button type="button" data-v="hoy">Hoy</button><button type="button" data-v="ayer">Ayer</button><button type="button" data-v="" class="on">Todos</button></div>'+
- '<input type="date" id="rvFe" title="Día de la revisión" aria-label="Día de la revisión"><select id="rvAna" aria-label="Analista"></select><select id="rvTec" aria-label="Técnico"></select>'+
+ '<span class="fdr"><label>Desde <input type="date" id="rvDes"></label><label>Hasta <input type="date" id="rvHas"></label></span>'+'<select id="rvAna" aria-label="Analista"></select><select id="rvTec" aria-label="Técnico"></select>'+
  '<div class="kseg" id="rvEst"></div><input type="search" id="rvQ" placeholder="Buscar orden, NIC o técnico" aria-label="Buscar"></div>'+
  '<div class="rvw"><table class="rvt" id="rvT"></table></div>';
-var RVF={dia:'',fe:'',ana:'',tec:'',est:'',q:''};
+var RVF={dia:'',ana:'',tec:'',est:'',q:''};
 function rvFilas(){var M={};ORD.forEach(function(x){M[x.o]=x});
  var os=Object.keys(K).filter(function(o){return /^\d{6,}$/.test(o)&&(est(o)!=='PENDIENTE'||(K[o]&&K[o].obs))});
  ORD.forEach(function(x){if(!K[x.o]&&/^LIBERADA/.test(est(x.o)))os.push(x.o)});
@@ -616,7 +617,7 @@ function rvFilas(){var M={};ORD.forEach(function(x){M[x.o]=x});
   .sort(function(a,b){return(b.t||0)-(a.t||0)})}
 function rvFiltradas(L){var h=new Date(),hoy=dk(h);h.setDate(h.getDate()-1);var ayer=dk(h),q=RVF.q.toLowerCase();
  return L.filter(function(r){var d=r.t?dk(new Date(r.t)):'';if(RVF.dia==='hoy'&&d!==hoy)return false;if(RVF.dia==='ayer'&&d!==ayer)return false;
-  if(RVF.fe&&d!==RVF.fe.replace(/-/g,''))return false;if(RVF.ana&&r.ana!==RVF.ana)return false;if(RVF.tec&&r.tec!==RVF.tec)return false;if(RVF.est==='LIB'?!/^LIBERADA/.test(r.est):RVF.est&&r.est!==RVF.est)return false;
+  var de=($('rvDes').value||'').replace(/-/g,''),ha=($('rvHas').value||'').replace(/-/g,'');if(de&&(!d||d<de))return false;if(ha&&(!d||d>ha))return false;if(RVF.ana&&r.ana!==RVF.ana)return false;if(RVF.tec&&r.tec!==RVF.tec)return false;if(RVF.est==='LIB'?!/^LIBERADA/.test(r.est):RVF.est&&r.est!==RVF.est)return false;
   if(q&&(r.o+' '+r.nic+' '+r.tec+' '+r.ana).toLowerCase().indexOf(q)<0)return false;return true})}
 var EC={C:'✓',NC:'✗',NA:'N/A'},EX={C:'CONFORME',NC:'NO CONFORME',NA:'NO APLICA'};
 function rvPintar(){var L=rvFiltradas(rvFilas()),A=rvFilas(),an={},te={},c={'':A.length,'EN REVISIÓN':0,FINALIZADA:0,LIB:0,'LIBERADA PENDIENTE':0};
@@ -633,9 +634,9 @@ function rvPintar(){var L=rvFiltradas(rvFilas()),A=rvFilas(),an={},te={},c={'':A
    '<td class="rvnc">'+esc(r.nc.join(', '))+'</td><td>'+esc(r.ser)+'</td><td class="rvob">'+esc(r.obs)+'</td></tr>'}).join('')||'<tr><td colspan="'+(12+ITEMS.length)+'" class="mu" style="padding:14px">No hay revisiones con estos filtros.</td></tr>')+'</tbody>'}
 window.revMostrar=function(){if(!ORD.length&&window.kDatos)window.kDatos();rvPintar();bajarTodo().then(rvPintar);cargarCfg()};
 $('rvT').onclick=function(e){var tr=e.target.closest('tr[data-o]');if(!tr)return;X.ir('chk');window.kAbrir(tr.getAttribute('data-o'))};
-$('rvDia').onclick=function(e){var b=e.target.closest('button');if(!b)return;RVF.dia=b.dataset.v;[].forEach.call(this.children,function(x){x.classList.toggle('on',x===b)});rvPintar()};
+$('rvDia').onclick=function(e){var b=e.target.closest('button');if(!b)return;RVF.dia=b.dataset.v;if(RVF.dia){$('rvDes').value='';$('rvHas').value=''}[].forEach.call(this.children,function(x){x.classList.toggle('on',x===b)});rvPintar()};
 $('rvEst').onclick=function(e){var b=e.target.closest('button');if(!b)return;RVF.est=b.dataset.v;rvPintar()};
-$('rvFe').onchange=function(){RVF.fe=this.value;rvPintar()};$('rvAna').onchange=function(){RVF.ana=this.value;rvPintar()};$('rvTec').onchange=function(){RVF.tec=this.value;rvPintar()};
+$('rvDes').onchange=$('rvHas').onchange=function(){RVF.dia='';[].forEach.call($('rvDia').children,function(x){x.classList.toggle('on',!x.dataset.v)});rvPintar()};$('rvAna').onchange=function(){RVF.ana=this.value;rvPintar()};$('rvTec').onchange=function(){RVF.tec=this.value;rvPintar()};
 var tq2;$('rvQ').oninput=function(){var v=this.value;clearTimeout(tq2);tq2=setTimeout(function(){RVF.q=v.trim();rvPintar()},180)};
 $('rvXls').onclick=function(){if(typeof XLSX==='undefined'){toast('No cargó la librería de Excel.',true);return}var L=rvFiltradas(rvFilas());if(!L.length){toast('No hay filas para exportar.',true);return}
  var H=['Orden','NIC','Técnico','Fecha visita','Analista','Revisada','Estado','Resultado','Liberada'].concat(ITEMS.map(function(t){return t[1]}),['No conformes','Serial','Observaciones']);
@@ -663,7 +664,8 @@ document.addEventListener('keydown',function(e){
  else if(kx==='r')girar(90);else if(e.key==='+')zCentro(1.4);else if(e.key==='-')zCentro(1/1.4);
  else return;e.preventDefault()});
 function seg(id,key){$(id).onclick=function(e){var b=e.target.closest('button');if(!b)return;FILT[key]=b.getAttribute('data-v');if(id==='kDia')[].forEach.call(this.children,function(x){x.classList.toggle('on',x===b)});lista()}}
-seg('kDia','dia');seg('kEst','est');seg('kSer','ser');seg('kAsig','asig');
+seg('kDia','dia');$('kDia').addEventListener('click',function(){if(FILT.dia){$('kDes').value='';$('kHas').value=''}});
+$('kDes').onchange=$('kHas').onchange=function(){FILT.dia='';[].forEach.call($('kDia').children,function(x){x.classList.toggle('on',!x.getAttribute('data-v'))});lista()};seg('kEst','est');seg('kSer','ser');seg('kAsig','asig');
 $('kTec').onchange=function(){FILT.tec=this.value;lista()};$('kMo').onchange=function(){FILT.mo=this.value;lista()};
 var tq;$('kQ').oninput=function(){var v=this.value;clearTimeout(tq);tq=setTimeout(function(){FILT.q=v.trim();lista()},180)};
 $('kVer').onclick=verificarLote;
