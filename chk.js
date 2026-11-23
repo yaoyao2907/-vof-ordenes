@@ -475,9 +475,16 @@ function Zoomer(st,zw,im,op){var z={s:1,tx:0,ty:0,bw:0,bh:0,min:1,ini:1,cont:1,l
  im.addEventListener('load',function(){ajustar()});
  return{ajustar:ajustar,centro:centro,z:z}}
 var ZF=Zoomer($('kSt'),$('kZW'),$('kLbI'),{rot:function(){return CUR?rotDe(LBI):0}});
-var ZA=Zoomer($('kASt'),$('kAZW'),$('kAI'),{ancho:true,clic:function(x,y){var a=(K[CUR.o]||{}).acta||{},b=a.obsBox;if(b&&y>=b[0]-0.005&&y<=b[1]+0.005)verObs()}});
+var ZA=Zoomer($('kASt'),$('kAZW'),$('kAI'),{ancho:true,clic:function(x,y){var b=cajaObs($('kAI'))||((K[CUR.o]||{}).acta||{}).obsBox;if(b&&y>=b[0]-0.005&&y<=b[1]+0.005)verObs()}});
 /* el mismo cuadro de observaciones del acta, ampliado en el centro; tocar el fondo vuelve al acta */
-function verObs(){var a=(K[CUR.o]||{}).acta||{},b=a.obsBox,im=$('kAI'),c=$('kAObsT');c.innerHTML='';
+/* ubica el último cuadro (OBSERVACIONES) en la imagen del acta: primero por el contorno azul; si no lo tiene, por la última barra azul oscura de título */
+function cajaObs(im){try{var W=im.naturalWidth,H=im.naturalHeight;if(!W||!H)return null;var cv=document.createElement('canvas');cv.width=W;cv.height=H;var g=cv.getContext('2d');g.drawImage(im,0,0);
+ var d=g.getImageData(0,0,14,H).data,y0=-1,y1=-1,y,x,i;
+ for(y=0;y<H;y++)for(x=0;x<14;x++){i=(y*14+x)*4;if(d[i]<90&&d[i+1]>55&&d[i+1]<130&&d[i+2]>170){if(y0<0)y0=y;y1=y;break}}
+ if(y0>=0&&y1-y0>20)return[y0/H,(y1+1)/H];
+ var cx=Math.floor(W/2),col=g.getImageData(cx-2,0,4,H).data,azul=function(yy){var k=yy*16;return col[k]<60&&col[k+1]<60&&col[k+2]>90};
+ for(y=H-1;y>H*0.4;y--)if(azul(y)){var top=y;while(top>0&&azul(top-1))top--;return[Math.max(0,top-6)/H,1]}}catch(e){}return null}
+function verObs(){var a=(K[CUR.o]||{}).acta||{},im=$('kAI'),b=cajaObs(im)||a.obsBox,c=$('kAObsT');c.innerHTML='';
  if(b&&im.naturalWidth){var W=im.naturalWidth,H=im.naturalHeight,y0=Math.max(0,Math.floor(b[0]*H)-4),y1=Math.min(H,Math.ceil(b[1]*H)+4),cv=document.createElement('canvas');
   cv.width=W;cv.height=y1-y0;cv.getContext('2d').drawImage(im,0,y0,W,y1-y0,0,0,W,y1-y0);c.appendChild(cv);c.classList.remove('txt')}
  else{c.textContent=a.obsTxt||'No se pudo encontrar el comentario en esta acta. Usa el botón PDF.';c.classList.add('txt')}
