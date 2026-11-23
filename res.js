@@ -5,7 +5,7 @@ var $=X.$,esc=X.esc,toast=X.toast,drMsg=X.drMsg,drLista=X.drLista,drBytes=X.drBy
 
 /* ---------- plantilla de la pestaña ---------- */
 var COLS=[ /* [clave en el Excel, título corto, clase, ancho relativo, título completo] — orden de la plantilla VOF CAMP */
- ['_est','Estado','est',5.6,'Estado en Validar IA'],['_pdf','PDF','pdf',2.3],['Hora','Hora','nw',4.4],['Orden','Orden','st3',5.6],['NIC','NIC','nw',4.6],['Técnico','Técnico','a',7.6],['Proceso','Proceso','nw',4.6],['Tipo Orden','Tipo orden','nw',4.2],
+ ['_est','Estado','est',5.6,'Estado en Validar'],['_pdf','PDF','pdf',2.3],['Hora','Hora','nw',4.4],['Orden','Orden','st3',5.6],['NIC','NIC','nw',4.6],['Técnico','Técnico','a',7.6],['Proceso','Proceso','nw',4.6],['Tipo Orden','Tipo orden','nw',4.2],
  ['IRREGULARIDAD','Irregularidad','a',8.4],['TIPO DE IRRE','Tipo de irre','w',9],
  ['APLICA PARE','PARE','',2.8,'Aplica PARE'],['SE NECESITA VIDEO','Nec. video','',2.8,'Se necesita video'],['LO SUBIÓ AL APLICATIVO','Subió video','',2.8,'Lo subió al aplicativo'],['APOYO CARRO CANASTA','Canasta','',3,'Apoyo carro canasta'],
  ['NOVEDAD IRREGULARIDAD','Novedad irreg.','w',7,'Novedad irregularidad'],['Resultado','Resultado','',5],['Cobro mal','Cobro mal','',3.2],
@@ -28,7 +28,7 @@ $('tRes').innerHTML=
    '<div class="card"><h3>Por técnico <span class="mu" style="font-weight:400;text-transform:none;letter-spacing:0">(los de más NO CUMPLE)</span></h3><div class="cb" id="rTec"></div></div>'+
    '<div class="card"><h3>Criterios que más fallan</h3><div class="cb" id="rCri"></div></div>'+
    '<div class="card"><h3>Campaña vs PQR</h3><div class="cb" id="rPro"></div></div></div>'+
-  '<div class="card rt"><div class="tb"><h3 style="margin:0" id="rTt">Órdenes</h3><span style="flex:1"></span><span class="mu" style="font-size:11px">Clic en un título para ordenar · clic en la orden para abrirla en Validar IA</span></div>'+
+  '<div class="card rt"><div class="tb"><h3 style="margin:0" id="rTt">Órdenes</h3><span style="flex:1"></span><span class="mu" style="font-size:11px">Clic en un título para ordenar · clic en la orden para abrirla en Validar</span></div>'+
    '<div class="cb" id="rTw"><table><colgroup>'+COLS.map(function(c){return'<col style="width:'+(c[3]*100/ANCHO).toFixed(2)+'%">'}).join('')+'</colgroup><thead><tr id="rTh"></tr><tr id="rTf" class="tf"></tr></thead><tbody id="rTb"></tbody></table>'+
    '<p class="mu" id="rPg" style="margin:8px 0 0;font-size:11px"></p><button class="b s" id="rMas" type="button" hidden>Mostrar más</button></div></div>'+
  '</div>';
@@ -181,8 +181,8 @@ function rTabla(){
   return'<th class="'+c[2]+(s?' so':'')+(on?' on':'')+'"'+(s?' data-c="'+esc(c[0])+'" tabindex="0" title="Ordenar por '+esc(c[4]||c[1])+'"':'')+'>'+esc(c[1])+(on?(rOrd.d<0?' ▼':' ▲'):'')+'</th>'}).join('');
  $('rTb').innerHTML=l.slice(0,rLimN).map(function(r){var s=rv(r,'Resultado'),o=rv(r,'Orden');
   var es=estDe(r);
-  return'<tr data-o="'+esc(o)+'"'+(/^LIBERADA/.test(es)||pyLib(r)?' class="lib"':'')+' tabindex="0">'+COLS.map(function(c){var k=c[0],v;
-   if(k==='_est')return'<td class="est">'+(es?'<span class="pl '+(es==='FINALIZADA'?'OK':es==='EN REVISIÓN'?'A':/^LIBERADA/.test(es)?'B':'P')+'">'+esc(es)+'</span>':'')+'</td>';
+  return'<tr data-o="'+esc(o)+'"'+(/^LIBERADA/.test(es)||pyLib(r)||(window.kFueLib&&window.kFueLib(o))?' class="lib"':'')+' tabindex="0">'+COLS.map(function(c){var k=c[0],v;
+   if(k==='_est')return'<td class="est">'+(es?'<span class="pl '+(es==='AUDITADA'?'OK':es==='EN REVISIÓN'?'A':/^LIBERADA/.test(es)?'B':'P')+'">'+esc(es)+'</span>':'')+'</td>';
    if(k==='_pdf'){var u=PDFS[o];return'<td class="pdf">'+(u?'<a class="pdfb" href="'+esc(u)+'" target="_blank" rel="noopener" title="Abrir el acta '+esc(o)+'.pdf en Drive (desde ahí se descarga)">PDF</a>':'<span class="pdfb no" title="'+(pdfBusy?'Buscando las actas en Drive…':'No hay acta de esta orden en VOF CAMP/ORDENES')+'">PDF</span>')+'</td>'}
    if(k==='_alertas')return'<td'+(r._tags.length?' data-tip="'+esc(r._tags.map(function(t){return t[1]}).join(' | '))+'"':'')+'>'+r._tags.map(function(t){return'<span class="tg '+t[0]+'">'+t[1]+'</span>'}).join('')+'</td>';
    if(k==='_crit')return'<td'+(r._crit?' data-tip="'+esc(r._crit.split(' ').map(function(c){var t=(RS.crit.filter(function(x){return x.c===c})[0]||{}).t;return c+(t?' — '+t:'')}).join(' | '))+'"':'')+'>'+r._crit.split(' ').filter(Boolean).map(function(x){return'<span class="tg '+(x[0]==='C'||x[0]==='T'?'er':'wn')+'">'+x+'</span>'}).join('')+'</td>';

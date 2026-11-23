@@ -23,17 +23,19 @@ var SER={CONFORME:'Serial conforme','NO CONFORME':'Serial no conforme','SIN LEER
 var sec=document.createElement('section');sec.id='tChk';sec.hidden=true;
 var ref=$('tVid')||$('tHis');ref.parentNode.insertBefore(sec,ref);
 sec.innerHTML=
- '<div class="khd"><b>Validar IA · revisión de la orden</b><span class="mu" id="kInfo">Carga el resultado para ver las órdenes.</span><span style="flex:1"></span>'+
+ '<div class="khd"><b>Validar · revisión de la orden</b><span class="mu" id="kInfo">Carga el resultado para ver las órdenes.</span><span style="flex:1"></span>'+
  '<label class="kan">Analista <select id="kAna"><option value="">— escoge —</option></select></label>'+
  '<button class="b s" id="kPdf" type="button">Abrir PDF del computador</button><input type="file" id="kFi" accept=".pdf" hidden></div>'+
- '<div class="kf"><div class="kseg" id="kDia"><button type="button" data-v="hoy">Hoy</button><button type="button" data-v="ayer">Ayer</button><button type="button" data-v="" class="on">Todos</button></div>'+'<span class="fdr"><label>Desde <input type="date" id="kDes"></label><label>Hasta <input type="date" id="kHas"></label></span>'+
+ '<div class="kf"><label class="kfl">Día <select id="kDiaS" aria-label="Día"><option value="">Todos</option></select></label>'+
+ '<label class="kfl">Hora <select id="kHora" aria-label="Orden por hora"><option value="asc">De menor a mayor</option><option value="desc">De mayor a menor</option></select></label>'+
+ '<span class="mu sm">Las auditadas salen de esta lista.</span></div>'+
+ '<div hidden><div class="kseg" id="kDia"><button type="button" data-v="hoy">Hoy</button><button type="button" data-v="ayer">Ayer</button><button type="button" data-v="" class="on">Todos</button></div>'+'<span class="fdr"><label>Desde <input type="date" id="kDes"></label><label>Hasta <input type="date" id="kHas"></label></span>'+
  '<div class="kseg" id="kEst"></div>'+
  '<select id="kTec" aria-label="Técnico"><option value="">Técnico: todos</option></select>'+
  '<select id="kMo" aria-label="Mano de obra"><option value="">Mano de obra: todas</option></select>'+
  '<input type="search" id="kQ" placeholder="Buscar orden, NIC o técnico" aria-label="Buscar orden"></div>'+
- '<div class="kf ks2" id="kAsigF"><span class="mu sm">Órdenes:</span><div class="kseg" id="kAsig"></div></div>'+
- '<div class="kf ks2"><span class="mu sm">Seriales del medidor instalado:</span><div class="kseg" id="kSer"></div>'+
- '<button class="b s" id="kVer" type="button">Verificar seriales</button><span class="mu sm" id="kVerI"></span></div>'+
+ '</div><div class="kf ks2" id="kAsigF"><span class="mu sm">Órdenes:</span><div class="kseg" id="kAsig"></div></div>'+
+ '<div hidden><div class="kseg" id="kSer"></div><button class="b s" id="kVer" type="button">Verificar seriales</button><span class="mu sm" id="kVerI"></span></div>'+
  '<div class="kbox"><aside class="klst" id="kLst"></aside><div class="kdet" id="kDet"></div></div>'+
  '<div class="klb" id="kLb" hidden><div class="klbw" id="kLbW">'+
   '<aside class="klba" id="kLbA"><div class="klbah"><b>Acta</b><span class="mu sm">rueda = zoom</span><span style="flex:1"></span><button type="button" id="kAZ" title="Ajustar al ancho">Ancho</button><button type="button" id="kAC" title="Ver el acta completa">Completa</button><button type="button" id="kAObsB" title="Leer el comentario completo">Comentario</button><button type="button" id="kAO" title="Ocultar el acta">Ocultar ◂</button></div>'+
@@ -48,7 +50,7 @@ sec.innerHTML=
   '<div class="klbp" id="kLbPan"></div></div></div>'+
   '<div class="kpdfov" id="kPdfOv" hidden><div class="kpdfh"><b id="kPdfT">PDF</b><span class="mu sm" id="kPdfM"></span><span style="flex:1"></span><a class="b s" id="kPdfD" download>Descargar</a><button type="button" class="b s" id="kPdfX">✕ Cerrar</button></div><iframe id="kPdfF" title="PDF del acta"></iframe></div>';
 
-var ORD=[],K={},CUR=null,FILT={dia:'',est:'',tec:'',mo:'',q:'',ser:'',asig:'mios'},LOCKS={},ANAS=[],DRV=null,arr=false,LBI=-1,VER=null;
+var ORD=[],K={},CUR=null,FILT={dia:'',est:'',tec:'',mo:'',q:'',ser:'',asig:'mios',diaS:'',hora:'asc'},LOCKS={},ANAS=[],DRV=null,arr=false,LBI=-1,VER=null;
 try{K=JSON.parse(localStorage.getItem('vof_chk2')||'{}')||{}}catch(e){K={}}
 var ANA0='';try{ANA0=localStorage.getItem('vof_analista')||''}catch(e){}
 try{ANAS=JSON.parse(localStorage.getItem('vof_analistas')||'[]')||[]}catch(e){ANAS=[]}
@@ -66,19 +68,22 @@ function dk(d){return d.getFullYear()+('0'+(d.getMonth()+1)).slice(-2)+('0'+d.ge
 function L(s){return String(s==null?'':s).toUpperCase().replace(/[^A-Z0-9]/g,'').replace(/^0+/,'')}
 function igual(a,b){a=L(a);b=L(b);if(!a||!b||b.length<4)return null;return a===b||(b.length>=6&&(a.indexOf(b)>=0||b.indexOf(a)>=0))}
 window.kEstado=function(o){return ORDM[o]?est(o):''};
-function ecl(e){return e==='FINALIZADA'?'ok':e==='EN REVISIÓN'?'wn':/^LIBERADA/.test(e)?'lb':''}
+function ecl(e){return e==='AUDITADA'?'ok':e==='EN REVISIÓN'?'wn':/^LIBERADA/.test(e)?'lb':''}
 function kk(o){var k=K[o]||(K[o]={t:0});if(!k.fotos)k.fotos={};if(!k.items)k.items={};return k}
 function itemsCon(k){var it=(k||{}).items||{};return ITEMS.filter(function(t){return(it[t[0]]||{}).e}).length}
-/* LIBERADA: la orden quedó mal y se vuelve a hacer. LIBERADA PENDIENTE: volvió a aparecer (misma OS con otra visita, o el mismo NIC en otra OS) y falta revisarla. */
+/* LIBERADA: la orden quedó mal (la liberó un analista o SIPREM, o es el mismo NIC de una liberada); vuelve a la lista hasta auditarla otra vez. */
 var ORDM={},LIBNIC={},LIBT=0;
 function armarLib(){if(Date.now()-LIBT<400)return;LIBT=Date.now();LIBNIC={};
  Object.keys(K).forEach(function(o){var l=K[o]&&K[o].lib;if(!l)return;var nic=l.nic||(ORDM[o]||{}).nic;if(!nic)return;(LIBNIC[nic]=LIBNIC[nic]||[]).push({o:o,k:fk(l.fecha||(ORDM[o]||{}).fecha||'')})})}
 function reNic(x){armarLib();var L=LIBNIC[x.nic];if(!x.nic||!L)return'';for(var i=0;i<L.length;i++)if(L[i].o!==x.o&&String(x.k||'')>=String(L[i].k||''))return L[i].o;return''}
 function reOS(o){var k=K[o],x=ORDM[o];return!!(k&&k.lib&&x&&!x.lib&&x.fecha&&k.lib.fecha&&x.fecha!==k.lib.fecha)}
-function est(o){var k=K[o],x=ORDM[o];if(!k){if(x&&x.lib)return'LIBERADA';if(x&&reNic(x))return'LIBERADA PENDIENTE';return'PENDIENTE'}
- var lt=k.lib?k.lib.t:0;if(k.fin&&k.fin.t>lt)return'FINALIZADA';
- if(k.lib)return reOS(o)?'LIBERADA PENDIENTE':'LIBERADA';
- if(x&&(x.lib))return'LIBERADA';if(x&&reNic(x))return'LIBERADA PENDIENTE';if(k.fin)return'FINALIZADA';
+/* PENDIENTE → EN REVISIÓN → AUDITADA. Si se libera: LIBERADA (vuelve a la lista) hasta que se audite otra vez; el fondo azul se queda siempre. */
+function fueLib(o){var k=K[o]||{},x=ORDM[o];return!!(k.lib||(k.libs&&k.libs.length)||(x&&(x.lib||reNic(x))))}
+window.kFueLib=fueLib;
+function est(o){var k=K[o],x=ORDM[o];if(!k){if(x&&(x.lib||reNic(x)))return'LIBERADA';return'PENDIENTE'}
+ var lt=k.lib?k.lib.t:0;if(k.fin&&k.fin.t>lt)return'AUDITADA';
+ if(k.lib)return'LIBERADA';
+ if(x&&(x.lib||reNic(x)))return'LIBERADA';if(k.fin)return'AUDITADA';
  if(itemsCon(k))return'EN REVISIÓN';var f=k.fotos||{};return Object.keys(f).some(function(i){return f[i].item})?'EN REVISIÓN':'PENDIENTE'}
 function fechaCorta(t){try{return new Date(t).toLocaleString('es-CO',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}catch(e){return''}}
 function sello(m){m.por=ana();m.t=Date.now()}
@@ -93,7 +98,7 @@ async function bajarTodo(){var d=db();if(!d)return;
  try{var r=await Promise.race([d.collection('vchk').get(),new Promise(function(ok){setTimeout(function(){ok(null)},20000)})]);if(!r)return;
   r.docs.forEach(function(x){var v=x.data()||{};if(v.resp&&!v.fotos)return;               /* formato viejo de pasos: se ignora */
    if(!K[x.id]||(v.t||0)>=(K[x.id].t||0))K[x.id]=v});guardarLocal();lista();
-  var ae=document.activeElement;if(CUR&&!LBabierto()&&!(ae&&$('kDet').contains(ae)&&/INPUT|TEXTAREA/.test(ae.tagName)))pintar();if(!rsec.hidden)rvPintar()}catch(e){}}
+  var ae=document.activeElement;if(CUR&&!LBabierto()&&!(ae&&$('kDet').contains(ae)&&/INPUT|TEXTAREA/.test(ae.tagName)))pintar();if(!rsec.hidden)rvPintar();if(window.lbPintarV)window.lbPintarV()}catch(e){}}
 /* ---------- órdenes (del resultado) ---------- */
 window.kDatos=function(){
  var A=window.rFilas?window.rFilas():[];
@@ -105,6 +110,8 @@ window.kDatos=function(){
   if(x.lib&&!(K[x.o]&&(K[x.o].lib||K[x.o].libQuit))){var k=kk(x.o);k.lib={t:Date.now(),por:'SIPREM',fecha:x.fecha,nic:x.nic,auto:1};k.t=Date.now();guardarLocal();subir(x.o)}});
  LIBT=0;
  ORD.sort(function(a,b){return(a.k+a.hora).localeCompare(b.k+b.hora)});
+ var ds={};ORD.forEach(function(x){if(x.k)ds[x.k]=(ds[x.k]||0)+1});
+ $('kDiaS').innerHTML='<option value="">Todos</option>'+Object.keys(ds).sort().reverse().map(function(k){return'<option value="'+k+'"'+(k===FILT.diaS?' selected':'')+'>'+k.slice(6)+'/'+k.slice(4,6)+'/'+k.slice(0,4)+'</option>'}).join('');
  var ts={},ms={};ORD.forEach(function(x){if(x.tec)ts[x.tec]=1;x.mo.forEach(function(m){ms[m]=(ms[m]||0)+1})});
  $('kTec').innerHTML='<option value="">Técnico: todos</option>'+Object.keys(ts).sort().map(function(t){return'<option'+(t===FILT.tec?' selected':'')+'>'+esc(t)+'</option>'}).join('');
  var mk=Object.keys(ms).sort(function(a,b){var ia=/^INST/i.test(a),ib=/^INST/i.test(b);return ia!==ib?(ia?-1:1):a.localeCompare(b)});
@@ -113,17 +120,19 @@ window.kDatos=function(){
  lista()};
 function base(sinEst,sinSer,sinAsig){var mt=misTecs();var h=new Date(),hoy=dk(h);h.setDate(h.getDate()-1);var ayer=dk(h),q=FILT.q.toLowerCase();
  var de=($('kDes').value||'').replace(/-/g,''),ha=($('kHas').value||'').replace(/-/g,'');
- return ORD.filter(function(x){if(FILT.dia==='hoy'&&x.k!==hoy)return false;if(FILT.dia==='ayer'&&x.k!==ayer)return false;if(de&&(!x.k||x.k<de))return false;if(ha&&(!x.k||x.k>ha))return false;
+ var R=ORD.filter(function(x){if(FILT.diaS&&x.k!==FILT.diaS)return false;if(est(x.o)==='AUDITADA')return false;
+  if(FILT.dia==='hoy'&&x.k!==hoy)return false;if(FILT.dia==='ayer'&&x.k!==ayer)return false;if(de&&(!x.k||x.k<de))return false;if(ha&&(!x.k||x.k>ha))return false;
   if(FILT.tec&&x.tec!==FILT.tec)return false;if(FILT.mo&&x.mo.indexOf(FILT.mo)<0)return false;
   if(q&&(x.o+' '+x.nic+' '+x.tec).toLowerCase().indexOf(q)<0)return false;
   if(!sinAsig&&FILT.asig==='mios'&&mt&&mt.indexOf(x.tec)<0)return false;
   if(!sinAsig&&FILT.asig==='sin'&&asignado(x.tec))return false;
   if(!sinEst&&FILT.est&&est(x.o)!==FILT.est)return false;
   if(!sinSer&&FILT.ser){var s=(K[x.o]||{}).serial;if(FILT.ser==='SIN VERIFICAR'?!!s:!(s&&s.res===FILT.ser))return false}
-  return true})}
+  return true});
+ return FILT.hora==='desc'?R.reverse():R}
 function contadores(){
- var B=base(true,false),c={'':B.length,PENDIENTE:0,'EN REVISIÓN':0,FINALIZADA:0,LIBERADA:0,'LIBERADA PENDIENTE':0};B.forEach(function(x){c[est(x.o)]++});
- $('kEst').innerHTML=[['','Todas'],['PENDIENTE','Pendientes'],['EN REVISIÓN','En revisión'],['FINALIZADA','Finalizadas'],['LIBERADA','Liberadas'],['LIBERADA PENDIENTE','Liberada pendiente']].map(function(e){
+ var B=base(true,false),c={'':B.length,PENDIENTE:0,'EN REVISIÓN':0,AUDITADA:0,LIBERADA:0};B.forEach(function(x){c[est(x.o)]++});
+ $('kEst').innerHTML=[['','Todas'],['PENDIENTE','Pendientes'],['EN REVISIÓN','En revisión'],['AUDITADA','Auditadas'],['LIBERADA','Liberadas']].map(function(e){
   return'<button type="button" data-v="'+e[0]+'" class="'+(FILT.est===e[0]?'on':'')+'">'+e[1]+' <b>'+c[e[0]]+'</b></button>'}).join('');
  var S=base(false,true),s={'':S.length,CONFORME:0,'NO CONFORME':0,'SIN LEER':0,'SIN VERIFICAR':0};
  S.forEach(function(x){var r=(K[x.o]||{}).serial;if(!r)s['SIN VERIFICAR']++;else if(s[r.res]!==undefined)s[r.res]++});
@@ -134,13 +143,13 @@ function contadores(){
  $('kAsig').innerHTML=(mt?'<button type="button" data-v="mios" class="'+(FILT.asig==='mios'?'on':'')+'">Mis técnicos <b>'+na.mios+'</b></button>':'')+
   '<button type="button" data-v="sin" class="'+(FILT.asig==='sin'?'on':'')+'">Sin asignar <b>'+na.sin+'</b></button>'+
   '<button type="button" data-v="" class="'+(!FILT.asig||(FILT.asig==='mios'&&!mt)?'on':'')+'">Ver todas <b>'+na['']+'</b></button>';
- var fin=c.FINALIZADA;return{fin:fin,tot:B.length}}
+ var fin=c.AUDITADA;return{fin:fin,tot:B.length}}
 var tRR=0;
 function lista(){clearTimeout(tRR);tRR=setTimeout(function(){if(window.rRefrescar)window.rRefrescar()},600);
  var cc=contadores(),F=base();
- $('kLst').innerHTML='<div class="klh">'+F.length+' órdenes · <b>'+cc.fin+'</b> finalizadas de '+cc.tot+'</div>'+(F.slice(0,500).map(function(x){var e=est(x.o),k=K[x.o]||{},n=itemsCon(k),s=k.serial;
-  return'<button type="button" class="kit'+(CUR&&CUR.o===x.o?' on':'')+(/^LIBERADA/.test(e)?' lib':'')+'" data-o="'+esc(x.o)+'"><b>'+esc(x.o)+'</b> <span class="mu">'+esc(x.fecha.slice(0,5))+' '+esc(x.hora.slice(0,5))+'</span><br><span class="sm">'+esc(x.tec||'(sin técnico)')+'</span><br>'+
-   '<span class="ke '+ecl(e)+'">'+e+'</span>'+(e==='LIBERADA PENDIENTE'&&reNic(x)?' <span class="mu sm">reemplaza a '+esc(reNic(x))+'</span>':'')+(lockDe(x.o)?' <span class="klk" title="La está revisando">🔒 '+esc(lockDe(x.o))+'</span>':'')+(n?' <span class="mu sm">'+n+'/'+ITEMS.length+' ítems</span>':'')+
+ $('kLst').innerHTML='<div class="klh"><b>'+F.length+'</b> por auditar</div>'+(F.slice(0,500).map(function(x){var e=est(x.o),k=K[x.o]||{},n=itemsCon(k),s=k.serial;
+  return'<button type="button" class="kit'+(CUR&&CUR.o===x.o?' on':'')+(fueLib(x.o)?' lib':'')+'" data-o="'+esc(x.o)+'"><b>'+esc(x.o)+'</b> <span class="mu">'+esc(x.fecha.slice(0,5))+' '+esc(x.hora.slice(0,5))+'</span><br><span class="sm">'+esc(x.tec||'(sin técnico)')+'</span><br>'+
+   '<span class="ke '+ecl(e)+'">'+e+'</span>'+(e==='LIBERADA'&&!(K[x.o]||{}).lib&&reNic(x)?' <span class="mu sm">reemplaza a '+esc(reNic(x))+'</span>':'')+(TOM===x.o?' <span class="klk mio">⭐ Comprometida</span>':lockDe(x.o)?' <span class="klk" title="La está revisando">🔒 '+esc(lockDe(x.o))+'</span>':'')+(n?' <span class="mu sm">'+n+'/'+ITEMS.length+' ítems</span>':'')+
    (s?' <span class="ksr '+(s.res==='CONFORME'?'ok':s.res==='NO CONFORME'?'er':'')+'">'+(s.res==='CONFORME'?'serial ✓':s.res==='NO CONFORME'?'serial ✗':s.res==='SIN LEER'?'serial ?':'sin cambio')+'</span>':'')+'</button>'}).join('')||'<p class="mu" style="padding:12px">No hay órdenes con estos filtros.</p>')}
 
 /* ================= FOTOS: navegador (IndexedDB) → Drive → PDF ================= */
@@ -216,7 +225,7 @@ async function corrSub(){if(SQon)return;SQon=true;
 /* ---------- precarga en fila: una orden a la vez, todas las que siguen en la lista ---------- */
 var GEN=0;
 async function filaPrecarga(gen){if(!CUR)return;
- var F=base().filter(function(y){return est(y.o)!=='FINALIZADA'}),i=F.findIndex(function(y){return y.o===CUR.o}),sig=F.slice(i+1);
+ var F=base().filter(function(y){return est(y.o)!=='AUDITADA'}),i=F.findIndex(function(y){return y.o===CUR.o}),sig=F.slice(i+1);
  for(var n=0;n<sig.length;n++){var o=sig[n].o;if(gen!==GEN)return;
   if(MEM[o]&&MEM[o].listo)continue;
   var v=await idbGet(o);if(v&&v.fotos&&v.fotos.length&&v.acta&&(K[o]||{}).acta)continue;     /* ya está lista en el navegador */
@@ -326,12 +335,26 @@ async function tomarOrden(o){
 function soltarOrden(o){if(!o)return;if(TOM===o)TOM='';if(LOCKS[o]&&LOCKS[o].por===ana())delete LOCKS[o];
  if(window.vofPuente&&ana())window.vofPuente('tomar',{orden:o,quien:ana(),soltar:true}).catch(function(){})}
 setInterval(function(){if(!TOM)return;
- if(Date.now()-ULT<600000){var o0=TOM;window.vofPuente('tomar',{orden:o0,quien:ana()}).then(function(j){if(j&&j.tomada===false&&j.por){TOM='';LOCKS[o0]={por:j.por,t:Date.now()};
+ if(Date.now()-ULT<1800000){var o0=TOM;window.vofPuente('tomar',{orden:o0,quien:ana()}).then(function(j){if(j&&j.tomada===false&&j.por){TOM='';LOCKS[o0]={por:j.por,t:Date.now()};
   if(CUR&&CUR.o===o0){CUR.ro='El administrador le pasó esta orden a '+j.por+' — solo puedes mirarla.';pintar();if(LBabierto())lbPanel()}lista()}}).catch(function(){})}
- else{var o=TOM;soltarOrden(o);if(CUR&&CUR.o===o){CUR.ro='La orden se soltó por 10 minutos sin actividad. Vuelve a abrirla para seguir revisando.';pintar();if(LBabierto())lbPanel()}}},60000);
+ else{var o=TOM;soltarOrden(o);if(CUR&&CUR.o===o){CUR.ro=COMP;toast('La orden '+o+' se soltó por 30 minutos sin actividad.',true);pintar();if(LBabierto())lbPanel()}}},60000);
 setInterval(function(){if(!sec.hidden&&!document.hidden)leerLocks()},60000);
 window.addEventListener('pagehide',function(){if(TOM&&window.vofAviso)window.vofAviso('tomar',{orden:TOM,quien:ana(),soltar:true})});
-function puedo(){if(CUR&&CUR.ro){toast(CUR.ro,true);return false}return true}
+var COMP='Esta orden no está comprometida. Dale "Comprometer" para revisarla (cada analista tiene una sola a la vez).';
+function msgOtro(por,desde){return'En revisión por '+por+(desde?' desde las '+new Date(desde).toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'}):'')+' — solo puedes mirarla.'}
+/* al abrir: ver si la orden es de otro analista, si ya era mía, o si está libre (entonces toca Comprometer) */
+async function estadoLock(o){var l=null;try{var d=db();if(d){var r=await d.doc('vlock/'+o).get();if(r.exists)l=r.data()}}catch(e){}
+ if(!CUR||CUR.o!==o)return;var vivo=l&&l.por&&Date.now()-(l.t||0)<180000;
+ if(vivo&&l.por!==ana()){LOCKS[o]=l;CUR.ro=msgOtro(l.por,l.desde)}
+ else if(vivo&&ana()&&l.por===ana()){var j=await tomarOrden(o);if(!CUR||CUR.o!==o)return;CUR.ro=j.tomada?'':j.por?msgOtro(j.por,j.desde):COMP}
+ else CUR.ro=ana()?COMP:'Escoge tu nombre en "Analista" arriba para revisar esta orden.';
+ pintar();lista();if(LBabierto())lbPanel()}
+async function comprometer(){if(!CUR)return;var o=CUR.o;if(!ana()){toast('Escoge primero tu nombre en "Analista".',true);$('kAna').focus();return}
+ var antes=TOM,j=await tomarOrden(o);if(!CUR||CUR.o!==o)return;
+ if(j.tomada){Object.keys(LOCKS).forEach(function(k){if(k!==o&&LOCKS[k]&&LOCKS[k].por===ana())delete LOCKS[k]});CUR.ro='';toast('Orden '+o+' comprometida'+(antes&&antes!==o?' (se soltó la '+antes+')':''))}
+ else CUR.ro=j.por?msgOtro(j.por,j.desde):COMP;
+ pintar();lista();if(LBabierto())lbPanel()}
+function puedo(){if(CUR&&CUR.ro){toast(CUR.ro===COMP?'Primero dale "Comprometer".':CUR.ro,true);return false}return true}
 async function liberarAdmin(){var o=CUR.o,c=prompt('Clave de administrador para liberar la orden '+o+':');if(!c)return;
  if(!ana()){toast('Escoge primero tu nombre en "Analista".',true);return}
  try{var j=await window.vofPuente('tomar',{orden:o,quien:ana(),forzar:true,admin:c});if(j.tomada){TOM=o;LOCKS[o]={por:ana(),t:Date.now()};if(CUR&&CUR.o===o){CUR.ro='';pintar();lista()}toast('Orden liberada: ahora la tienes tú.')}}
@@ -344,11 +367,8 @@ function abrir(o,u8){
  GEN++;var gen=GEN;
  var x=ORD.filter(function(y){return y.o===o})[0]||{o:o,nic:'',tec:'',fecha:'',hora:'',irr:'',mo:[]};
  if(LBabierto())lbCerrar(true);
- if(TOM&&TOM!==o)soltarOrden(TOM);
- CUR={o:o,x:x,ro:'Revisando si otro analista tiene esta orden…'};var E=cargar(o,u8);lista();pintar();
- tomarOrden(o).then(function(j){if(!CUR||CUR.o!==o)return;
-  CUR.ro=j.tomada?'':j.sinNombre?'Escoge tu nombre en "Analista" arriba para revisar esta orden.':'En revisión por '+j.por+(j.desde?' desde las '+new Date(j.desde).toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'}):'')+' — solo puedes mirarla.';
-  pintar();lista();if(LBabierto())lbPanel()});
+ CUR={o:o,x:x,ro:TOM===o?'':'Revisando si otro analista tiene esta orden…'};var E=cargar(o,u8);lista();pintar();
+ if(TOM!==o)estadoLock(o);
  E.prom.then(function(){if(gen!==GEN||!CUR||CUR.o!==o)return;completar();pintar();filaPrecarga(gen)})}
 function E_(){return CUR&&MEM[CUR.o]||{fotos:[],listo:false,estado:'Cargando…'}}
 function completar(){var a=(K[CUR.o]||{}).acta||{},x=CUR.x;if(!x.nic)x.nic=a.nic||'';if(!x.fecha)x.fecha=a.fecha||'';if(!x.tec)x.tec=a.tec||''}
@@ -366,13 +386,26 @@ function cabecera(){var x=CUR.x,k=K[CUR.o]||{},e=est(CUR.o),E=E_();
   '<span class="ke big '+ecl(e)+'">'+e+'</span>'+
   (k.fin?'<span class="mu sm">Cerrada por '+esc(k.fin.por||'?')+' el '+esc(fechaCorta(k.fin.t))+'</span>':'')+
   '<span style="flex:1"></span>'+fuenteTxt(E)+'<button type="button" class="kpdf" id="kVerPdf">PDF</button></div>'+
-  (CUR.ro?'<div class="kro">🔒 '+esc(CUR.ro)+(/En revisión por/.test(CUR.ro)?' <button type="button" class="b s" id="kLib">Liberar (admin)</button>':'')+'</div>':'')}
+  (CUR.ro?'<div class="kro">🔒 '+esc(CUR.ro)+(CUR.ro===COMP?' <button type="button" class="kbt si" data-comp="1">⭐ Comprometer</button>':'')+(/En revisión por/.test(CUR.ro)?' <button type="button" class="b s" id="kLib">Liberar (admin)</button>':'')+'</div>':'')}
 function pintarCab(){var c=$('kCab');if(c&&CUR)c.outerHTML=cabecera()}
 function serialHtml(){var k=K[CUR.o]||{},a=k.acta||{},s=k.serial;
  var t='<div class="kser"><div><span class="mu sm">Serial medidor instalado (acta)</span><b>'+esc(a.cambioMed==='SI'?(a.medInst||'—'):a.cambioMed?'No se cambió medidor':'—')+'</b></div>';
  if(s)t+='<div><span class="mu sm">Leído '+(s.via==='barras'?'del código de barras':'por la IA')+'</span><b>'+esc(s.leido||'—')+'</b></div><span class="ksr big '+(s.res==='CONFORME'?'ok':s.res==='NO CONFORME'?'er':'')+'">'+esc(SER[s.res]||s.res)+'</span>'+
   (s.foto>=0?'<button type="button" class="b s" data-ir="'+s.foto+'">Ver foto '+(s.foto+1)+'</button>':'')+(s.aviso?'<span class="mu sm">'+esc(s.aviso)+'</span>':'');
  t+='<button type="button" class="b s" id="kSer1">'+(s?'Volver a verificar':'Verificar serial')+'</button></div>';return t}
+/* la fila del resultado de esta orden, debajo del técnico (mismas columnas de la tabla de Resultado) */
+var RCOLS=[['Proceso','Proceso'],['Tipo Orden','Tipo orden'],['IRREGULARIDAD','Irregularidad'],['TIPO DE IRRE','Tipo de irre'],['APLICA PARE','PARE'],['SE NECESITA VIDEO','Nec. video'],
+ ['LO SUBIÓ AL APLICATIVO','Subió video'],['APOYO CARRO CANASTA','Canasta'],['NOVEDAD IRREGULARIDAD','Novedad irreg.'],['Resultado','Resultado'],['Cobro mal','Cobro mal'],
+ ['Mano de obra cobrada mal','M. obra cobrada mal'],['Materiales cobrados mal','Materiales cobrados mal'],['Detalle','Detalle'],['_alertas','Alertas'],['_crit','Criterio']];
+function infoRes(){var A=window.rFilas?window.rFilas():[],r=null;for(var i=0;i<A.length;i++)if(rv(A[i],'Orden')===CUR.o){r=A[i];break}
+ if(!r)return'';
+ return'<div class="kri"><table><thead><tr>'+RCOLS.map(function(c){return'<th>'+esc(c[1])+'</th>'}).join('')+'</tr></thead><tbody><tr>'+RCOLS.map(function(c){var k=c[0],v;
+  if(k==='_alertas')return'<td>'+(r._tags||[]).map(function(t){return'<span class="ktg '+esc(t[0])+'">'+esc(t[1])+'</span>'}).join('')+'</td>';
+  if(k==='_crit')return'<td>'+String(r._crit||'').split(' ').filter(Boolean).map(function(x){return'<span class="ktg '+(x[0]==='C'||x[0]==='T'?'er':'wn')+'">'+esc(x)+'</span>'}).join('')+'</td>';
+  v=rv(r,k);if(k==='Proceso'&&v==='CAMPANA')v='CAMPAÑA';
+  if(k==='Resultado')return'<td><span class="kpl '+(v==='NO CUMPLE'?'er':v==='REVISAR'?'wn':v==='LIBERADA'?'lb':'ok')+'">'+esc(v)+'</span></td>';
+  var rojo=(k==='LO SUBIÓ AL APLICATIVO'&&v==='NO')||(k==='Cobro mal'&&v)||(k==='APLICA PARE'&&/^S/.test(v));
+  return'<td'+(rojo?' class="rr"':'')+'>'+esc(k==='Cobro mal'&&v?'SÍ':v)+'</td>'}).join('')+'</tr></tbody></table></div>'}
 function itemDe(i){return(((K[CUR.o]||{}).fotos||{})[i]||{}).item||''}
 function rotDe(i){return(((K[CUR.o]||{}).fotos||{})[i]||{}).rot||0}
 function chip(i){return'';var it=itemDe(i);if(!it)return'<span class="kchip nada">Sin ítem</span>';var e=(((K[CUR.o]||{}).items||{})[it]||{}).e;
@@ -395,19 +428,18 @@ function resumen(){var k=K[CUR.o]||{},it=k.items||{},hechos=itemsCon(k),nc=ITEMS
  if(nc.length)h+='<div class="knc"><b>No conformes</b>'+nc.map(function(t){var fs=fotosDeItem(t[0]);
   return'<div class="knci"><b>'+esc(t[1])+'</b></div>'}).join('')+'</div>';
  var e=est(CUR.o),x=ORDM[CUR.o]||CUR.x,rn=x?reNic(x):'';
- if(e==='LIBERADA')h+='<div class="klbx">🔵 <b>LIBERADA</b> por '+esc(k.lib.por||'?')+' el '+esc(fechaCorta(k.lib.t))+'. Queda pendiente hasta que la orden se vuelva a hacer.'+(CUR.ro?'':' <button type="button" class="b s" id="kDesLib">Quitar liberada</button>')+'</div>';
- if(e==='LIBERADA PENDIENTE')h+='<div class="klbx">🔵 <b>LIBERADA PENDIENTE</b>: '+(rn?'el NIC '+esc(x.nic)+' se liberó en la orden '+esc(rn):'esta orden se liberó el '+esc(fechaCorta(k.lib.t))+' y volvió con otra visita')+'. Revísala y finalízala.</div>';
+ if(e==='LIBERADA')h+='<div class="klbx">🔵 <b>LIBERADA</b> '+(k.lib?'por '+esc(k.lib.por||'?')+' el '+esc(fechaCorta(k.lib.t)):rn?'· el NIC '+esc(x.nic)+' se liberó en la orden '+esc(rn):'· SIPREM')+'. Revísala otra vez y dale <b>Finalizar</b>: queda AUDITADA (con fondo azul).'+(CUR.ro||!k.lib?'':' <button type="button" class="b s" id="kDesLib">Quitar liberada</button>')+'</div>';
+ if(e==='AUDITADA'&&fueLib(CUR.o))h+='<div class="klbx">🔵 Orden <b>auditada</b> después de liberada.</div>';
  var bLib=CUR.ro||e==='LIBERADA'?'':'<button type="button" class="kbt lbb big" id="kLibe">🔵 Liberada</button>';
- h+='<div class="kfin">'+(k.fin&&e==='FINALIZADA'?'<button type="button" class="kbt no big" id="kReab">Reabrir orden</button>'+bLib+'<span class="mu sm">Resultado: <b>'+esc(k.fin.res||'')+'</b></span>':
-  (CUR.ro||e==='LIBERADA'?'':'<button type="button" class="kbt si big" id="kFin">✓ Finalizar orden</button>')+bLib+'<span class="mu sm">'+(hechos<ITEMS.length?'Faltan '+(ITEMS.length-hechos)+' ítems sin estado.':'Los 14 ítems tienen estado.')+'</span>')+'</div></div>';return h}
+ h+='<div class="kfin">'+(k.fin&&e==='AUDITADA'?'<button type="button" class="kbt no big" id="kReab">Reabrir orden</button>'+bLib+'<span class="mu sm">Resultado: <b>'+esc(k.fin.res||'')+'</b></span>':
+  (CUR.ro?'':'<button type="button" class="kbt si big" id="kFin">✓ Finalizar orden</button>')+bLib+'<span class="mu sm">'+(hechos<ITEMS.length?'Faltan '+(ITEMS.length-hechos)+' ítems sin estado.':'Los 14 ítems tienen estado.')+'</span>')+'</div></div>';return h}
 function pintar(){
  if(!CUR){$('kDet').innerHTML='<div class="kvac"><b>Escoge una orden de la lista</b><p class="mu">Salen todas las fotos del acta. Dale clic a una para verla grande junto al acta recortada y marcar los 14 ítems. Todo se guarda solo en la nube.</p></div>';return}
  var E=E_(),k=K[CUR.o]||{},a=k.acta||{};
  if(!E.fotos.length&&!E.listo){$('kDet').innerHTML=cabecera()+'<div class="kvac"><span class="spin"></span> '+esc(E.estado||'Cargando…')+'</div>';return}
  if(!E.fotos.length&&E.err){$('kDet').innerHTML=cabecera()+'<div class="kvac"><b>No se pudo abrir el acta</b><p class="mu">'+esc(E.err)+'</p></div>';return}
- $('kDet').innerHTML=cabecera()+
+ $('kDet').innerHTML=cabecera()+infoRes()+
   ((a.irr||[]).length?'<div class="mu sm">Anomalías del acta: <b>'+esc(a.irr.join(' · '))+'</b></div>':'<div class="mu sm">El acta no reporta anomalía.</div>')+
-  serialHtml()+
   (E.listo?'':'<div class="kprog"><span class="spin"></span> '+esc(E.estado||'')+'</div>')+
   (!E.fotos.length?'<p class="mu">El acta no trae fotos.</p>':'')+
   '<div class="kgal">'+E.fotos.map(function(f,i){var it=itemDe(i),e=(((k.items||{})[it])||{}).e,r=rotDe(i);
@@ -447,7 +479,7 @@ function lbPanel(){var k=K[CUR.o]||{},it=itemDe(LBI);
   '<div class="knav"><button type="button" class="b s" data-n="-1">← Anterior</button><button type="button" class="b s" data-n="1">Siguiente →</button></div>'+
   obsHtml(true)+
   '<div class="mu sm">Teclas: ← → pasar · rueda = zoom · R girar · Esc cerrar</div>'+
-  (CUR.ro?'<div class="kro">🔒 '+esc(CUR.ro)+'</div>':'')+(k.fin?'<div class="kmsg">La orden está finalizada: si cambias algo, reábrela.</div>':'')}
+  (CUR.ro?'<div class="kro">🔒 '+esc(CUR.ro)+(CUR.ro===COMP?' <button type="button" class="kbt si" data-comp="1">⭐ Comprometer</button>':'')+'</div>':'')+(k.fin?'<div class="kmsg">La orden está finalizada: si cambias algo, reábrela.</div>':'')}
 function lbIr(n){var E=E_();if(n<0||n>=E.fotos.length)return;LBI=n;lbFoto();lbPanel()}
 
 /* zoom con la rueda (donde está el puntero), arrastrar, doble clic y girar: sirve para la foto y para el acta */
@@ -500,7 +532,7 @@ document.querySelector('#kLb .kzb').onclick=function(e){var t=e.target.closest('
 $('kAO').onclick=function(){ACTA_OCULTA=true;try{localStorage.setItem('vof_acta_oculta','1')}catch(x){}lbActa();setTimeout(function(){ZF.ajustar()},30)};
 $('kAZ').onclick=function(){ZA.ajustar()};$('kAC').onclick=function(){ZA.ajustar('cont')};
 $('kLbP').onclick=function(){lbIr(LBI-1)};$('kLbN').onclick=function(){lbIr(LBI+1)};
-$('kLbPan').onclick=function(e){if(clicItems(e,true))return;var t=e.target.closest('button');if(t&&t.dataset.n)lbIr(LBI+(+t.dataset.n))};
+$('kLbPan').onclick=function(e){if(e.target.closest('[data-comp]')){comprometer();return}if(clicItems(e,true))return;var t=e.target.closest('button');if(t&&t.dataset.n)lbIr(LBI+(+t.dataset.n))};
 $('kLbPan').oninput=inputObs;
 
 /* ---------- PDF dentro de la página (sin pestaña nueva) ---------- */
@@ -516,15 +548,15 @@ function finalizar(){if(!puedo())return;var k=kk(CUR.o);if(!ana()){toast('Escoge
  var it=k.items||{},nc=ITEMS.filter(function(t){return(it[t[0]]||{}).e==='NC'}),falta=ITEMS.length-itemsCon(k);
  if(falta&&!confirm('Faltan '+falta+' ítems sin estado. ¿Finalizar la orden igual?'))return;
  k.fin={t:Date.now(),por:ana(),res:nc.length?'CON NOVEDAD ('+nc.map(function(t){return t[1]}).join(', ')+')':falta?'SIN NOVEDAD · '+falta+' ítems sin revisar':'CONFORME'};
- k.ana=ana();k.t=Date.now();guardarLocal();subir(CUR.o);toast('Orden '+CUR.o+' finalizada');
+ k.ana=ana();k.t=Date.now();guardarLocal();subir(CUR.o);toast('Orden '+CUR.o+' auditada');soltarOrden(CUR.o);
  siguiente()}
-function siguiente(){var F=base().filter(function(y){return y.o!==CUR.o&&!/FINALIZADA|^LIBERADA$/.test(est(y.o))&&!lockDe(y.o)});if(F.length)abrir(F[0].o);else{soltarOrden(CUR.o);CUR.ro=CERR;pintar();lista()}}
+function siguiente(){var F=base().filter(function(y){return y.o!==CUR.o&&!/AUDITADA/.test(est(y.o))&&!lockDe(y.o)});if(F.length)abrir(F[0].o);else{soltarOrden(CUR.o);CUR.ro=CERR;pintar();lista()}}
 var CERR='Orden cerrada: vuelve a abrirla desde la lista para seguir.';
 function liberar(){if(!puedo())return;if(!ana()){toast('Escoge tu nombre en "Analista" arriba.',true);$('kAna').focus();return}
  if(!confirm('¿Marcar la orden '+CUR.o+' como LIBERADA?\nQueda pendiente hasta que se vuelva a realizar.'))return;
  var k=kk(CUR.o),x=ORDM[CUR.o]||CUR.x||{},a=k.acta||{},it=k.items||{};
  k.lib={t:Date.now(),por:ana(),fecha:x.fecha||a.fecha||'',nic:x.nic||a.nic||'',nc:ITEMS.filter(function(t){return(it[t[0]]||{}).e==='NC'}).map(function(t){return t[1]}).join(', ')};
- delete k.libQuit;k.ana=ana();k.t=Date.now();LIBT=0;guardarLocal();subir(CUR.o);toast('Orden '+CUR.o+' liberada');siguiente()}
+ (k.libs=k.libs||[]).push(k.lib);delete k.libQuit;k.ana=ana();k.t=Date.now();LIBT=0;guardarLocal();subir(CUR.o);toast('Orden '+CUR.o+' liberada: vuelve a la lista como LIBERADA');soltarOrden(CUR.o);siguiente()}
 function quitarLib(){if(CUR.ro===CERR){CUR.ro='';tomarOrden(CUR.o)}if(!puedo())return;if(!confirm('¿Quitarle el estado LIBERADA a la orden '+CUR.o+'?'))return;var k=kk(CUR.o);delete k.lib;k.libQuit=true;k.t=Date.now();LIBT=0;guardarLocal();subir(CUR.o);pintar();lista()}
 /* misma OS que volvió con otra visita: lo revisado antes se guarda aparte y se empieza de cero (fotos nuevas del PDF nuevo) */
 async function reiniciarLib(o){var k=kk(o),x=ORDM[o]||{};
@@ -658,15 +690,15 @@ function rvFiltradas(L){var h=new Date(),hoy=dk(h);h.setDate(h.getDate()-1);var 
   var de=($('rvDes').value||'').replace(/-/g,''),ha=($('rvHas').value||'').replace(/-/g,'');if(de&&(!d||d<de))return false;if(ha&&(!d||d>ha))return false;if(RVF.ana&&r.ana!==RVF.ana)return false;if(RVF.tec&&r.tec!==RVF.tec)return false;if(RVF.est==='LIB'?!/^LIBERADA/.test(r.est):RVF.est&&r.est!==RVF.est)return false;
   if(q&&(r.o+' '+r.nic+' '+r.tec+' '+r.ana).toLowerCase().indexOf(q)<0)return false;return true})}
 var EC={C:'✓',NC:'✗',NA:'N/A'},EX={C:'CONFORME',NC:'NO CONFORME',NA:'NO APLICA'};
-function rvPintar(){var L=rvFiltradas(rvFilas()),A=rvFilas(),an={},te={},c={'':A.length,'EN REVISIÓN':0,FINALIZADA:0,LIB:0,'LIBERADA PENDIENTE':0};
+function rvPintar(){var L=rvFiltradas(rvFilas()),A=rvFilas(),an={},te={},c={'':A.length,'EN REVISIÓN':0,AUDITADA:0,LIB:0};
  A.forEach(function(r){if(r.ana)an[r.ana]=1;if(r.tec)te[r.tec]=1;c[r.est]=(c[r.est]||0)+1;if(/^LIBERADA/.test(r.est))c.LIB++});
  $('rvAna').innerHTML='<option value="">Analista: todos</option>'+Object.keys(an).sort().map(function(a){return'<option'+(a===RVF.ana?' selected':'')+'>'+esc(a)+'</option>'}).join('');
  $('rvTec').innerHTML='<option value="">Técnico: todos</option>'+Object.keys(te).sort().map(function(a){return'<option'+(a===RVF.tec?' selected':'')+'>'+esc(a)+'</option>'}).join('');
- $('rvEst').innerHTML=[['','Todas'],['EN REVISIÓN','En revisión'],['FINALIZADA','Finalizadas'],['LIB','🔵 Liberadas'],['LIBERADA PENDIENTE','Liberada pendiente']].map(function(e){return'<button type="button" data-v="'+e[0]+'" class="'+(RVF.est===e[0]?'on':'')+(e[0]==='LIB'||e[0]==='LIBERADA PENDIENTE'?' lbs':'')+'">'+e[1]+' <b>'+(c[e[0]]||0)+'</b></button>'}).join('');
+ $('rvEst').innerHTML=[['','Todas'],['EN REVISIÓN','En revisión'],['AUDITADA','Auditadas'],['LIB','🔵 Liberadas']].map(function(e){return'<button type="button" data-v="'+e[0]+'" class="'+(RVF.est===e[0]?'on':'')+(e[0]==='LIB'?' lbs':'')+'">'+e[1]+' <b>'+(c[e[0]]||0)+'</b></button>'}).join('');
  $('rvInfo').textContent=L.length+' de '+A.length+' órdenes revisadas';
  $('rvT').innerHTML='<thead><tr><th>Orden</th><th>NIC</th><th>Técnico</th><th>Fecha visita</th><th>Analista</th><th>Revisada</th><th>Estado</th><th>Resultado</th><th>Liberada</th>'+
   ITEMS.map(function(t){return'<th class="rvi" title="'+esc(t[1])+'">'+esc(t[1])+'</th>'}).join('')+'<th>No conformes</th><th>Serial</th><th>Observaciones</th></tr></thead><tbody>'+
-  (L.slice(0,1500).map(function(r){return'<tr data-o="'+esc(r.o)+'"'+(/^LIBERADA/.test(r.est)?' class="lib"':'')+'><td><b>'+esc(r.o)+'</b></td><td>'+esc(r.nic)+'</td><td>'+esc(r.tec)+'</td><td>'+esc(String(r.fecha).slice(0,10))+'</td><td>'+esc(r.ana)+'</td><td>'+esc(r.t?fechaCorta(r.t):'')+'</td>'+
+  (L.slice(0,1500).map(function(r){return'<tr data-o="'+esc(r.o)+'"'+(fueLib(r.o)?' class="lib"':'')+'><td><b>'+esc(r.o)+'</b></td><td>'+esc(r.nic)+'</td><td>'+esc(r.tec)+'</td><td>'+esc(String(r.fecha).slice(0,10))+'</td><td>'+esc(r.ana)+'</td><td>'+esc(r.t?fechaCorta(r.t):'')+'</td>'+
    '<td><span class="ke '+ecl(r.est)+'">'+r.est+'</span></td><td>'+esc(r.res)+'</td><td>'+esc(r.re?'reemplaza a '+r.re:r.lib)+'</td>'+
    ITEMS.map(function(t){var e=(r.items[t[0]]||{}).e||'';return'<td class="rve '+(e==='C'?'c':e==='NC'?'nc':e==='NA'?'na':'')+'">'+(EC[e]||'')+'</td>'}).join('')+
    '<td class="rvnc">'+esc(r.nc.join(', '))+'</td><td>'+esc(r.ser)+'</td><td class="rvob">'+esc(r.obs)+'</td></tr>'}).join('')||'<tr><td colspan="'+(12+ITEMS.length)+'" class="mu" style="padding:14px">No hay revisiones con estos filtros.</td></tr>')+'</tbody>'}
@@ -682,6 +714,44 @@ $('rvXls').onclick=function(){if(typeof XLSX==='undefined'){toast('No cargó la 
  var ws=XLSX.utils.aoa_to_sheet(A);ws['!cols']=H.map(function(h,i){return{wch:i<9?14:i>=H.length-3?40:12}});var wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Revisiones');
  XLSX.writeFile(wb,'revisiones_'+dk(new Date())+'.xlsx')};
 
+/* ================= PESTAÑA LIBERADAS: repositorio de todas las órdenes liberadas (por el analista o por SIPREM) ================= */
+var lsec=document.createElement('section');lsec.id='tLib';lsec.hidden=true;rref.parentNode.insertBefore(lsec,rref);
+lsec.innerHTML='<div class="khd"><b>🔵 Liberadas</b><span class="mu" id="lbInfo"></span><span style="flex:1"></span><button class="b s" id="lbXls" type="button">Exportar a Excel</button></div>'+
+ '<div class="kf"><span class="fdr"><label>Desde <input type="date" id="lbDes"></label><label>Hasta <input type="date" id="lbHas"></label></span>'+
+ '<select id="lbOri" aria-label="Quién la liberó"><option value="">Liberó: todos</option><option value="SIPREM">SIPREM</option><option value="ANALISTA">Analista</option></select>'+
+ '<div class="kseg" id="lbEst"></div><input type="search" id="lbQ" placeholder="Buscar orden, NIC o técnico" aria-label="Buscar"></div>'+
+ '<div class="rvw"><table class="rvt" id="lbT"></table></div>';
+var LBF={est:'',q:''};
+function lbFilas(){var M={},os={};ORD.forEach(function(x){M[x.o]=x});
+ Object.keys(K).forEach(function(o){var k=K[o];if(k&&(k.lib||(k.libs&&k.libs.length)))os[o]=1});
+ ORD.forEach(function(x){if(x.lib||reNic(x))os[x.o]=1});
+ return Object.keys(os).map(function(o){var k=K[o]||{},x=M[o]||{},a=k.acta||{},l=k.lib||(k.libs||[]).slice(-1)[0]||null,re=x.o?reNic(x):'',it=k.items||{};
+  var sip=l?(l.por==='SIPREM'||l.auto):!!x.lib;
+  return{o:o,nic:x.nic||a.nic||(l&&l.nic)||'',tec:x.tec||a.tec||'',fecha:x.fecha||a.fecha||(l&&l.fecha)||'',ori:re&&!l?'MISMO NIC':sip?'SIPREM':'ANALISTA',
+   por:l?(l.por||''):re?'orden '+re:'SIPREM',t:l?l.t:0,veces:Math.max((k.libs||[]).length,l?1:0),nc:(l&&l.nc)||'',obs:k.obs||'',est:est(o),
+   aud:k.fin&&(!l||k.fin.t>l.t)?(k.fin.por||'')+' · '+fechaCorta(k.fin.t):''}}).sort(function(a,b){return(b.t||0)-(a.t||0)})}
+function lbFiltradas(L){var de=($('lbDes').value||'').replace(/-/g,''),ha=($('lbHas').value||'').replace(/-/g,''),ori=$('lbOri').value,q=LBF.q.toLowerCase();
+ return L.filter(function(r){var d=r.t?dk(new Date(r.t)):fk(r.fecha);if(de&&(!d||d<de))return false;if(ha&&(!d||d>ha))return false;
+  if(ori&&(ori==='SIPREM'?r.ori!=='SIPREM':r.ori==='SIPREM'))return false;if(LBF.est&&r.est!==LBF.est)return false;
+  if(q&&(r.o+' '+r.nic+' '+r.tec+' '+r.por).toLowerCase().indexOf(q)<0)return false;return true})}
+function lbPintar(){var A=lbFilas(),L=lbFiltradas(A),c={'':A.length,LIBERADA:0,AUDITADA:0};A.forEach(function(r){if(c[r.est]!=null)c[r.est]++});
+ $('lbEst').innerHTML=[['','Todas'],['LIBERADA','Por auditar'],['AUDITADA','Ya auditadas']].map(function(e){return'<button type="button" data-v="'+e[0]+'" class="'+(LBF.est===e[0]?'on':'')+'">'+e[1]+' <b>'+c[e[0]]+'</b></button>'}).join('');
+ $('lbInfo').textContent=L.length+' de '+A.length+' órdenes liberadas';
+ $('lbT').innerHTML='<thead><tr><th>Orden</th><th>NIC</th><th>Técnico</th><th>Fecha visita</th><th>Liberó</th><th>Por</th><th>Liberada el</th><th>Veces</th><th>No conformes</th><th>Estado</th><th>Auditada</th><th>Observaciones</th></tr></thead><tbody>'+
+  (L.slice(0,2000).map(function(r){return'<tr class="lib" data-o="'+esc(r.o)+'"><td><b>'+esc(r.o)+'</b></td><td>'+esc(r.nic)+'</td><td>'+esc(r.tec)+'</td><td>'+esc(String(r.fecha).slice(0,10))+'</td>'+
+   '<td>'+esc(r.ori)+'</td><td>'+esc(r.por)+'</td><td>'+esc(r.t?fechaCorta(r.t):'')+'</td><td>'+r.veces+'</td><td class="rvnc">'+esc(r.nc)+'</td>'+
+   '<td><span class="ke '+ecl(r.est)+'">'+r.est+'</span></td><td>'+esc(r.aud)+'</td><td class="rvob">'+esc(r.obs)+'</td></tr>'}).join('')||'<tr><td colspan="12" class="mu" style="padding:14px">No hay órdenes liberadas con estos filtros.</td></tr>')+'</tbody>'}
+window.lbPintarV=function(){if(!lsec.hidden)lbPintar()};
+window.libMostrar=function(){if(!ORD.length&&window.kDatos)window.kDatos();lbPintar();bajarTodo().then(lbPintar)};
+$('lbT').onclick=function(e){var tr=e.target.closest('tr[data-o]');if(!tr)return;X.ir('chk');window.kAbrir(tr.getAttribute('data-o'))};
+$('lbEst').onclick=function(e){var b=e.target.closest('button');if(!b)return;LBF.est=b.dataset.v;lbPintar()};
+$('lbDes').onchange=$('lbHas').onchange=$('lbOri').onchange=lbPintar;
+var tq3;$('lbQ').oninput=function(){var v=this.value;clearTimeout(tq3);tq3=setTimeout(function(){LBF.q=v.trim();lbPintar()},180)};
+$('lbXls').onclick=function(){if(typeof XLSX==='undefined'){toast('No cargó la librería de Excel.',true);return}var L=lbFiltradas(lbFilas());if(!L.length){toast('No hay filas para exportar.',true);return}
+ var H=['Orden','NIC','Técnico','Fecha visita','Liberó','Por','Liberada el','Veces','No conformes','Estado','Auditada','Observaciones'];
+ var A=[H].concat(L.map(function(r){return[r.o,r.nic,r.tec,r.fecha,r.ori,r.por,r.t?fechaCorta(r.t):'',r.veces,r.nc,r.est,r.aud,r.obs]}));
+ var ws=XLSX.utils.aoa_to_sheet(A);ws['!cols']=H.map(function(h,i){return{wch:i>=8?30:14}});var wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Liberadas');XLSX.writeFile(wb,'liberadas_'+dk(new Date())+'.xlsx')};
+
 /* ---------- eventos ---------- */
 $('kLst').onclick=function(e){var b=e.target.closest('.kit');if(b)abrir(b.getAttribute('data-o'))};
 $('kDet').onclick=async function(e){var t=e.target;
@@ -690,6 +760,7 @@ $('kDet').onclick=async function(e){var t=e.target;
  if(t.closest('.kits')&&clicItems(e,false))return;
  if(t.id==='kFin')finalizar();else if(t.id==='kLibe')liberar();else if(t.id==='kDesLib')quitarLib();else if(t.id==='kReab')reabrir();
  else if(t.id==='kLib')liberarAdmin();
+ else if(t.closest('[data-comp]'))comprometer();
  else if(t.id==='kReSub'){encolarSubida(CUR.o);pintarCab()}
  else if(t.id==='kSer1'){var o=CUR.o;t.disabled=true;t.textContent='Verificando…';delete kk(o).serial;try{await verificarSerial(o)}catch(x){toast('No se pudo verificar: '+((x&&x.message)||''),true)}VER_EN='';if(CUR&&CUR.o===o)pintar();lista()}
  else if(t.id==='kVerPdf')verPdf(CUR.o)};
@@ -703,6 +774,7 @@ document.addEventListener('keydown',function(e){
  else if(kx==='r')girar(90);else if(e.key==='+')zCentro(1.4);else if(e.key==='-')zCentro(1/1.4);
  else return;e.preventDefault()});
 function seg(id,key){$(id).onclick=function(e){var b=e.target.closest('button');if(!b)return;FILT[key]=b.getAttribute('data-v');if(id==='kDia')[].forEach.call(this.children,function(x){x.classList.toggle('on',x===b)});lista()}}
+$('kDiaS').onchange=function(){FILT.diaS=this.value;lista()};$('kHora').onchange=function(){FILT.hora=this.value;lista()};
 seg('kDia','dia');$('kDia').addEventListener('click',function(){if(FILT.dia){$('kDes').value='';$('kHas').value=''}});
 $('kDes').onchange=$('kHas').onchange=function(){FILT.dia='';[].forEach.call($('kDia').children,function(x){x.classList.toggle('on',!x.getAttribute('data-v'))});lista()};seg('kEst','est');seg('kSer','ser');seg('kAsig','asig');
 $('kTec').onchange=function(){FILT.tec=this.value;lista()};$('kMo').onchange=function(){FILT.mo=this.value;lista()};
